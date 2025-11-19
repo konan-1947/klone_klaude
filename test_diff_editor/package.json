@@ -1,0 +1,57 @@
+{
+  "name": "inline-diff-demo",
+  "displayName": "Inline Diff Demo",
+  "description": "Demo inline diff for AI suggestions",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "inline-diff.showDiff",
+        "title": "Show AI Inline Diff (Demo)"
+      },
+      {
+        "command": "inline-diff.acceptAll",
+        "title": "Accept All Changes"
+      },
+      {
+        "command": "inline-diff.rejectAll",
+        "title": "Reject All Changes"
+      },
+      {
+        "command": "inline-diff.clearDiff",
+        "title": "Clear Inline Diff"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "inline-diff.showDiff",
+        "key": "ctrl+shift+d",
+        "mac": "cmd+shift+d",
+        "when": "editorTextFocus"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/diff": "^7.0.2",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "diff": "^5.1.0"
+  }
+}
