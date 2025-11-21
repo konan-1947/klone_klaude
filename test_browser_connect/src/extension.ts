@@ -1,72 +1,36 @@
 import * as vscode from 'vscode';
-import { AIStudioViewProvider } from './viewProvider';
-import { BrowserBridgeManager } from './browserBridgeManager';
-import { AIStudioClient } from './aiStudioClient';
+import { ChatViewProvider } from './chatViewProvider';
+import { CookieManager } from './cookieManager';
 
-let bridgeManager: BrowserBridgeManager;
-let client: AIStudioClient;
+export function activate(context: vscode.ExtensionContext) {
+    console.log('Extension "Browser AI Studio Connect" is now active!');
 
-export async function activate(context: vscode.ExtensionContext) {
-    console.log('=== AI Studio Connector ACTIVATION STARTED (DISABLED) ===');
-    /*
-    try {
-        // Initialize managers
-        console.log('Creating BrowserBridgeManager...');
-        bridgeManager = new BrowserBridgeManager(context);
-        console.log('BrowserBridgeManager created');
+    const cookieManager = new CookieManager(context);
 
-        console.log('Creating AIStudioClient...');
-        client = new AIStudioClient();
-        console.log('AIStudioClient created');
+    // Register ChatViewProvider
+    const chatProvider = new ChatViewProvider(context.extensionUri, context);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider)
+    );
 
-        // Create view provider
-        console.log('Creating AIStudioViewProvider...');
-        const viewProvider = new AIStudioViewProvider(context, client, bridgeManager);
-        console.log('AIStudioViewProvider created');
+    // Register initialize command
+    const initCommand = vscode.commands.registerCommand('browser-connect.initialize', async () => {
+        const hasSession = await cookieManager.hasValidSession();
+        const userEmail = await cookieManager.getUserEmail();
 
-        // Register view
-        console.log('Registering webview view provider for aiStudioView...');
-        const registration = vscode.window.registerWebviewViewProvider(
-            'aiStudioView',
-            viewProvider
-        );
-        context.subscriptions.push(registration);
-        console.log('View provider registered successfully!');
+        if (hasSession) {
+            vscode.window.showInformationMessage(
+                `✅ Đã có session: ${userEmail || 'Unknown user'}`
+            );
+        } else {
+            vscode.window.showInformationMessage(
+                '📝 Chưa có session. Vui lòng khởi tạo browser từ panel Chat.'
+            );
+        }
+    });
 
-        // Register commands
-        context.subscriptions.push(
-            vscode.commands.registerCommand('aiStudio.login', async () => {
-                await viewProvider.handleLogin();
-            })
-        );
-
-        context.subscriptions.push(
-            vscode.commands.registerCommand('aiStudio.logout', async () => {
-                await viewProvider.handleLogout();
-            })
-        );
-
-        context.subscriptions.push(
-            vscode.commands.registerCommand('aiStudio.sendPrompt', async () => {
-                await viewProvider.handleSendPrompt();
-            })
-        );
-
-        vscode.window.showInformationMessage('AI Studio Connector activated!');
-    } catch (error) {
-        console.error('=== ACTIVATION ERROR ===', error);
-        vscode.window.showErrorMessage(`Failed to activate AI Studio Connector: ${error}`);
-    }
-    */
+    context.subscriptions.push(initCommand);
+    context.subscriptions.push(chatProvider);
 }
 
-export function deactivate() {
-    /*
-    if (bridgeManager) {
-        bridgeManager.dispose();
-    }
-    if (client) {
-        client.disconnect();
-    }
-    */
-}
+export function deactivate() { }

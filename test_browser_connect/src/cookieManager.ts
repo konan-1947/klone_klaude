@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Protocol } from 'puppeteer';
@@ -12,8 +13,11 @@ interface StoredSession {
 export class CookieManager {
     private storagePath: string;
 
-    constructor(storageDir: string) {
-        this.storagePath = path.join(storageDir, 'ai-studio-session.json');
+    constructor(context: vscode.ExtensionContext) {
+        this.storagePath = path.join(
+            context.globalStorageUri.fsPath,
+            'ai-studio-session.json'
+        );
     }
 
     async saveCookies(
@@ -23,7 +27,7 @@ export class CookieManager {
         const session: StoredSession = {
             cookies,
             savedAt: Date.now(),
-            expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
+            expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
             userEmail
         };
 
@@ -32,8 +36,6 @@ export class CookieManager {
             this.storagePath,
             JSON.stringify(session, null, 2)
         );
-
-        console.log('Cookies saved successfully');
     }
 
     async loadCookies(): Promise<Protocol.Network.Cookie[] | null> {
@@ -41,17 +43,13 @@ export class CookieManager {
             const data = await fs.promises.readFile(this.storagePath, 'utf8');
             const session: StoredSession = JSON.parse(data);
 
-            // Check expiration
             if (Date.now() > session.expiresAt) {
-                console.log('Cookies expired, clearing...');
                 await this.clearCookies();
                 return null;
             }
 
-            console.log('Cookies loaded successfully');
             return session.cookies;
         } catch (error) {
-            console.log('No saved cookies found');
             return null;
         }
     }
@@ -59,9 +57,8 @@ export class CookieManager {
     async clearCookies(): Promise<void> {
         try {
             await fs.promises.unlink(this.storagePath);
-            console.log('Cookies cleared');
         } catch {
-            // File không tồn tại, ignore
+            // File không tồn tại
         }
     }
 

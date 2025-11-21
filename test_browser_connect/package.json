@@ -1,68 +1,56 @@
 {
-    "name": "ai-studio-connector",
-    "displayName": "AI Studio Connector",
-    "description": "Connect VS Code to AI Studio via browser automation",
+    "name": "test-browser-connect",
+    "displayName": "Browser AI Studio Connect",
+    "description": "Connect to AI Studio via Browser",
     "version": "0.0.1",
     "engines": {
-        "vscode": "^1.80.0"
+        "vscode": "^1.90.0"
     },
     "categories": [
         "Other"
     ],
-    "activationEvents": [
-        "*"
-    ],
+    "activationEvents": [],
     "main": "./out/extension.js",
     "contributes": {
+        "commands": [
+            {
+                "command": "browser-connect.initialize",
+                "title": "Browser Connect: Initialize AI Studio",
+                "category": "AI"
+            }
+        ],
         "viewsContainers": {
             "activitybar": [
                 {
-                    "id": "aiStudioContainer",
-                    "title": "AI Studio",
-                    "icon": "resources/icon.svg"
+                    "id": "browser-connect-container",
+                    "title": "AI Studio Chat",
+                    "icon": "$(comment-discussion)"
                 }
             ]
         },
         "views": {
-            "aiStudioContainer": [
+            "browser-connect-container": [
                 {
-                    "id": "aiStudioView",
-                    "name": "AI Studio"
+                    "id": "browser-connect-chat",
+                    "name": "Chat",
+                    "type": "webview"
                 }
             ]
-        },
-        "commands": [
-            {
-                "command": "aiStudio.login",
-                "title": "Login to AI Studio",
-                "icon": "$(sign-in)"
-            },
-            {
-                "command": "aiStudio.logout",
-                "title": "Logout",
-                "icon": "$(sign-out)"
-            },
-            {
-                "command": "aiStudio.sendPrompt",
-                "title": "Send Prompt",
-                "icon": "$(send)"
-            }
-        ]
+        }
     },
     "scripts": {
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
-        "watch": "tsc -watch -p ./",
-        "pretest": "npm run compile"
-    },
-    "devDependencies": {
-        "@types/node": "^20.0.0",
-        "@types/vscode": "^1.80.0",
-        "@types/ws": "^8.5.10",
-        "typescript": "^5.0.0"
+        "watch": "tsc -watch -p ./"
     },
     "dependencies": {
         "puppeteer": "^21.0.0",
-        "ws": "^8.16.0"
+        "ws": "^8.14.0"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.90.0",
+        "@types/node": "20.x",
+        "@types/ws": "^8.5.0",
+        "typescript": "^5.4.5"
     }
 }
