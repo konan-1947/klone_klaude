@@ -1,3 +1,7 @@
+// Extension test_diff_editor đã được vô hiệu hóa tạm thời
+// Để kích hoạt lại, uncomment toàn bộ code dưới đây
+
+/*
 import * as vscode from 'vscode';
 import { DiffManager } from './diffManager';
 import { DiffCodeLensProvider } from './codeLensProvider';
@@ -150,10 +154,6 @@ export function activate(context: vscode.ExtensionContext) {
     );
 }
 
-/**
- * Simulate AI suggestion (mock function)
- * Trong thực tế, đây sẽ gọi AI API hoặc chatbot automation
- */
 function simulateAISuggestion(originalContent: string): string {
     // Detect language và tạo suggestion phù hợp
 
@@ -197,3 +197,4 @@ export function deactivate() {
         codeLensProvider.dispose();
     }
 }
+*/

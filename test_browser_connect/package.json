@@ -1,0 +1,68 @@
+{
+    "name": "ai-studio-connector",
+    "displayName": "AI Studio Connector",
+    "description": "Connect VS Code to AI Studio via browser automation",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.80.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "*"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "aiStudioContainer",
+                    "title": "AI Studio",
+                    "icon": "resources/icon.svg"
+                }
+            ]
+        },
+        "views": {
+            "aiStudioContainer": [
+                {
+                    "id": "aiStudioView",
+                    "name": "AI Studio"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "aiStudio.login",
+                "title": "Login to AI Studio",
+                "icon": "$(sign-in)"
+            },
+            {
+                "command": "aiStudio.logout",
+                "title": "Logout",
+                "icon": "$(sign-out)"
+            },
+            {
+                "command": "aiStudio.sendPrompt",
+                "title": "Send Prompt",
+                "icon": "$(send)"
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "@types/vscode": "^1.80.0",
+        "@types/ws": "^8.5.10",
+        "typescript": "^5.0.0"
+    },
+    "dependencies": {
+        "puppeteer": "^21.0.0",
+        "ws": "^8.16.0"
+    }
+}
