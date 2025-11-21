@@ -40,7 +40,8 @@
             "test-hello-world-container": [
                 {
                     "id": "test-hello-world-view",
-                    "name": "Welcome"
+                    "name": "Welcome",
+                    "type": "webview"
                 }
             ]
         }
