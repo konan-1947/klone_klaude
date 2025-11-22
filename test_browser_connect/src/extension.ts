@@ -1,19 +1,17 @@
 import * as vscode from 'vscode';
-import { ChatViewProvider } from './chatViewProvider';
-import { CookieManager } from './cookieManager';
+import { ChatViewProvider } from './providers/chat/ChatViewProvider';
+import { CookieManager } from './core/cookie/CookieManager';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Extension "Browser AI Studio Connect" is now active!');
 
     const cookieManager = new CookieManager(context);
 
-    // Register ChatViewProvider
     const chatProvider = new ChatViewProvider(context.extensionUri, context);
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider)
     );
 
-    // Register initialize command
     const initCommand = vscode.commands.registerCommand('browser-connect.initialize', async () => {
         const hasSession = await cookieManager.hasValidSession();
         const userEmail = await cookieManager.getUserEmail();

@@ -1,123 +1,6 @@
-import * as vscode from 'vscode';
-import { AIStudioBrowser } from './aiStudioBrowser';
-import { CookieManager } from './cookieManager';
-
-export class ChatViewProvider implements vscode.WebviewViewProvider {
-    public static readonly viewType = 'browser-connect-chat';
-    private _view?: vscode.WebviewView;
-    private aiStudioBrowser: AIStudioBrowser | null = null;
-    private cookieManager: CookieManager;
-    private isInitialized: boolean = false;
-
-    constructor(private readonly _extensionUri: vscode.Uri, private context: vscode.ExtensionContext) {
-        this.cookieManager = new CookieManager(context);
-    }
-
-    public resolveWebviewView(
-        webviewView: vscode.WebviewView,
-        context: vscode.WebviewViewResolveContext,
-        _token: vscode.CancellationToken,
-    ) {
-        this._view = webviewView;
-
-        webviewView.webview.options = {
-            enableScripts: true,
-            localResourceRoots: [this._extensionUri]
-        };
-
-        webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
-
-        webviewView.webview.onDidReceiveMessage(async data => {
-            switch (data.type) {
-                case 'initialize':
-                    await this.initializeBrowser();
-                    break;
-                case 'sendMessage':
-                    await this.handleSendMessage(data.message);
-                    break;
-            }
-        });
-
-        this.checkAuthStatus();
-    }
-
-    private async checkAuthStatus() {
-        const hasSession = await this.cookieManager.hasValidSession();
-        const userEmail = await this.cookieManager.getUserEmail();
-
-        if (this._view) {
-            this._view.webview.postMessage({
-                type: 'authStatus',
-                authenticated: hasSession,
-                userEmail: userEmail
-            });
-        }
-    }
-
-    private async initializeBrowser() {
-        if (this.isInitialized && this.aiStudioBrowser) {
-            this._view?.webview.postMessage({
-                type: 'systemMessage',
-                message: 'Browser đã được khởi tạo'
-            });
-            return;
-        }
-
-        try {
-            this._view?.webview.postMessage({
-                type: 'systemMessage',
-                message: '🚀 Đang khởi tạo browser...'
-            });
-
-            this.aiStudioBrowser = new AIStudioBrowser(this.cookieManager);
-            await this.aiStudioBrowser.initialize();
-
-            this.isInitialized = true;
-
-            this._view?.webview.postMessage({
-                type: 'systemMessage',
-                message: '✅ Browser đã sẵn sàng!'
-            });
-        } catch (error: any) {
-            this._view?.webview.postMessage({
-                type: 'systemMessage',
-                message: `❌ Lỗi khởi tạo: ${error.message}`
-            });
-        }
-    }
-
-    private async handleSendMessage(message: string) {
-        if (!this.aiStudioBrowser || !this.isInitialized) {
-            this._view?.webview.postMessage({
-                type: 'systemMessage',
-                message: '⚠️ Browser chưa được khởi tạo. Nhấn "Initialize Browser" trước.'
-            });
-            return;
-        }
-
-        try {
-            this._view?.webview.postMessage({
-                type: 'systemMessage',
-                message: '⏳ Đang gửi prompt...'
-            });
-
-            const response = await this.aiStudioBrowser.sendPrompt(message);
-
-            this._view?.webview.postMessage({
-                type: 'receiveMessage',
-                message: response
-            });
-        } catch (error: any) {
-            this._view?.webview.postMessage({
-                type: 'systemMessage',
-                message: `❌ Lỗi: ${error.message}`
-            });
-        }
-    }
-
-    private _getHtmlForWebview(webview: vscode.Webview) {
-        return `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -133,7 +16,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             color: var(--vscode-foreground);
             background-color: var(--vscode-editor-background);
         }
-        
+
         #status-bar {
             padding: 8px;
             background-color: var(--vscode-statusBar-background);
@@ -142,11 +25,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             margin-bottom: 10px;
             font-size: 12px;
         }
-        
+
         #init-container {
             margin-bottom: 10px;
         }
-        
+
         #init-button {
             width: 100%;
             padding: 10px;
@@ -157,11 +40,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             cursor: pointer;
             font-weight: bold;
         }
-        
+
         #init-button:hover {
             background-color: var(--vscode-button-hoverBackground);
         }
-        
+
         #chat-container {
             flex: 1;
             overflow-y: auto;
@@ -170,7 +53,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             border: 1px solid var(--vscode-panel-border);
             border-radius: 4px;
         }
-        
+
         .message {
             margin-bottom: 12px;
             padding: 8px 12px;
@@ -178,19 +61,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             max-width: 85%;
             word-wrap: break-word;
         }
-        
+
         .user-message {
             background-color: var(--vscode-button-background);
             color: var(--vscode-button-foreground);
             margin-left: auto;
             text-align: right;
         }
-        
+
         .bot-message {
             background-color: var(--vscode-input-background);
             border: 1px solid var(--vscode-input-border);
         }
-        
+
         .system-message {
             background-color: var(--vscode-badge-background);
             color: var(--vscode-badge-foreground);
@@ -199,12 +82,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             padding: 6px 10px;
             margin: 8px auto;
         }
-        
+
         #input-container {
             display: flex;
             gap: 8px;
         }
-        
+
         #message-input {
             flex: 1;
             padding: 8px;
@@ -214,11 +97,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             border-radius: 4px;
             outline: none;
         }
-        
+
         #message-input:focus {
             border-color: var(--vscode-focusBorder);
         }
-        
+
         #send-button {
             padding: 8px 16px;
             background-color: var(--vscode-button-background);
@@ -227,12 +110,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             border-radius: 4px;
             cursor: pointer;
         }
-        
+
         #send-button:hover {
             background-color: var(--vscode-button-hoverBackground);
         }
     </style>
 </head>
+
 <body>
     <div id="status-bar">Status: Not initialized</div>
     <div id="init-container">
@@ -254,7 +138,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
         function addMessage(text, type) {
             const messageDiv = document.createElement('div');
-            
+
             if (type === 'user') {
                 messageDiv.className = 'message user-message';
             } else if (type === 'bot') {
@@ -262,7 +146,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             } else if (type === 'system') {
                 messageDiv.className = 'message system-message';
             }
-            
+
             messageDiv.textContent = text;
             chatContainer.appendChild(messageDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -285,7 +169,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         });
 
         sendButton.addEventListener('click', sendMessage);
-        
+
         messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 sendMessage();
@@ -294,7 +178,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
         window.addEventListener('message', event => {
             const message = event.data;
-            
+
             if (message.type === 'receiveMessage') {
                 addMessage(message.message, 'bot');
             } else if (message.type === 'systemMessage') {
@@ -309,12 +193,5 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         });
     </script>
 </body>
-</html>`;
-    }
 
-    public dispose() {
-        if (this.aiStudioBrowser) {
-            this.aiStudioBrowser.close();
-        }
-    }
-}
+</html>
