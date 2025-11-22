@@ -33,15 +33,31 @@ User Request (VS Code)
 │ - Track progress                    │
 └─────────────────────────────────────┘
     ↓
-    ├─────────────────┬─────────────────┐
-    ↓                 ↓                 ↓
-┌─────────┐    ┌─────────┐    ┌─────────┐
-│ 4. LLM  │    │ 5. TOOL │    │ 6. CTX  │
-│ MANAGER │    │ MANAGER │    │ MANAGER │
-└─────────┘    └─────────┘    └─────────┘
+    ├──────────────┬──────────────┬─────────────┐
+    ↓              ↓              ↓             ↓
+┌────────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+│    PTK     │ │   LLM   │ │  TOOL   │ │ CONTEXT │
+│  MANAGER   │ │ MANAGER │ │ MANAGER │ │ MANAGER │
+│            │ │         │ │         │ │         │
+│ - Format   │ │ - Call  │ │ - Exec  │ │ - State │
+│ - Parse    │ │   LLM   │ │   tools │ │   store │
+│ - Tool loop│ │         │ │         │ │         │
+└────────────┘ └─────────┘ └─────────┘ └─────────┘
+    │               ↑            ↑            ↑
+    └───────────────┴────────────┴────────────┘
+         PTK uses LLM, Tool, Context
     ↓
 Show Result (Inline Diff)
 ```
+
+**Manager Roles:**
+- **Complexity Manager**: Đánh giá độ phức tạp request
+- **Plan Manager**: Tạo execution plan (steps)
+- **Execution Manager**: Điều phối thực thi plan
+- **PTK Manager**: Gateway cho tool calling (format prompts, parse responses, orchestrate loop)
+- **LLM Manager**: Gọi LLM providers (AI Studio, OpenAI, etc.)
+- **Tool Manager**: Execute tools (read_file, search_code, etc.)
+- **Context Manager**: Quản lý state/context cho agent
 
 ---
 
@@ -146,32 +162,78 @@ while (current != null):
 
 ---
 
-### 4. LLM Manager
+### 4. PTK Manager
 
 **Responsibilities**:
-- Gọi LLM (API hoặc chatbot automation)
-- Build prompts
-- Parse responses
+- Format prompts cho tool calling
+- Parse LLM responses để detect tool calls
+- Orchestrate tool calling loop (LLM ↔ Tool)
+- Manage conversation history trong tool calling session
 
 **Input**:
-- Step config (prompt, model, temperature)
+- User prompt
+- Available tools
 - Context
 
 **Output**:
-- LLM response (text/code)
+- Final response (sau khi complete tool calling loop)
 
 **Methods**:
-- `call(prompt, config)` → response
-- `buildPrompt(step, context)` → prompt
-- `parseResponse(response)` → structured data
+- `execute(prompt, tools)` → response
+- `formatPrompt(prompt, tools, context)` → formatted prompt
+- `parseResponse(response)` → { type: 'text' | 'tool_call', ... }
+- `executeToolLoop(prompt, tools)` → final response
 
-**Implementations**:
-- ChatGPT Web Automation (Puppeteer)
-- OpenAI API (backup/comparison)
+**Components**:
+- **PTKFormatter**: Build prompts với tool definitions
+- **PTKParser**: Parse responses, detect `<PTK_CALL>` tags
+- **PTKExecutor**: Orchestrate loop giữa LLM và Tool
+
+**Dependencies**:
+- Uses **LLM Manager** để gọi LLM
+- Uses **Tool Manager** để execute tools
+- Uses **Context Manager** để read/write conversation history
+
+**Flow**:
+```
+1. Format prompt với tool definitions
+2. Call LLM Manager
+3. Parse response
+4. If tool_call detected:
+   - Execute tool via Tool Manager
+   - Add result to conversation
+   - Loop back to step 2
+5. Else: Return text response
+```
 
 ---
 
-### 5. Tool Manager
+### 5. LLM Manager
+
+**Responsibilities**:
+- Gọi LLM providers (AI Studio, OpenAI, Claude, etc.)
+- NO prompt building (PTK Manager làm việc đó)
+- NO response parsing for tool calls (PTK Manager làm việc đó)
+
+**Input**:
+- Prompt (đã được format bởi PTK Manager hoặc Execution Manager)
+- Config (model, temperature, max_tokens)
+
+**Output**:
+- Raw LLM response (text)
+
+**Methods**:
+- `call(prompt, config)` → response
+
+**Implementations**:
+- AI Studio Browser Automation (Puppeteer)
+- OpenAI API
+- Anthropic Claude API
+- Local models (Ollama)
+
+---
+
+### 6. Tool Manager
 
 **Responsibilities**:
 - Execute tools (read_file, run_tests, search, etc.)
@@ -198,7 +260,7 @@ while (current != null):
 
 ---
 
-### 6. Context Manager
+### 7. Context Manager
 
 **Responsibilities**:
 - Quản lý shared context
