@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Studio Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-family: var(--vscode-font-family);
+            color: var(--vscode-foreground);
+            background-color: var(--vscode-editor-background);
+            font-size: 13px;
+        }
+
+        #header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #status {
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        #actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            padding: 4px 12px;
+            background: transparent;
+            color: var(--vscode-foreground);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        .action-btn.primary {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+        }
+
+        .action-btn.primary:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+
+        #chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .message {
+            padding: 10px 12px;
+            border-radius: 6px;
+            line-height: 1.5;
+        }
+
+        .user-message {
+            background-color: var(--vscode-input-background);
+            border-left: 3px solid var(--vscode-button-background);
+        }
+
+        .bot-message {
+            background-color: var(--vscode-editor-background);
+            border-left: 3px solid var(--vscode-descriptionForeground);
+        }
+
+        .system-message {
+            text-align: center;
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            padding: 6px;
+        }
+
+        #input-container {
+            padding: 12px 16px;
+            border-top: 1px solid var(--vscode-panel-border);
+            display: flex;
+            gap: 8px;
+        }
+
+        #message-input {
+            flex: 1;
+            padding: 8px 12px;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            outline: none;
+            font-family: var(--vscode-font-family);
+            font-size: 13px;
+        }
+
+        #message-input:focus {
+            border-color: var(--vscode-focusBorder);
+        }
+
+        #send-button {
+            padding: 8px 16px;
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background-color 0.2s;
+        }
+
+        #send-button:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+
+        #send-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="header">
+        <div id="status">Not initialized</div>
+        <div id="actions">
+            <button id="init-button" class="action-btn primary">Initialize</button>
+            <button id="logout-button" class="action-btn hidden">Logout</button>
+        </div>
+    </div>
+
+    <div id="chat-container"></div>
+
+    <div id="input-container">
+        <input type="text" id="message-input" placeholder="Type your message..." />
+        <button id="send-button">Send</button>
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+        const chatContainer = document.getElementById('chat-container');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const initButton = document.getElementById('init-button');
+        const logoutButton = document.getElementById('logout-button');
+        const statusDiv = document.getElementById('status');
+
+        function addMessage(text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            messageDiv.textContent = text;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message) {
+                addMessage(message, 'user');
+                vscode.postMessage({
+                    type: 'sendMessage',
+                    message: message
+                });
+                messageInput.value = '';
+            }
+        }
+
+        initButton.addEventListener('click', () => {
+            vscode.postMessage({ type: 'initialize' });
+        });
+
+        logoutButton.addEventListener('click', () => {
+            vscode.postMessage({ type: 'logout' });
+        });
+
+        sendButton.addEventListener('click', sendMessage);
+
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        window.addEventListener('message', event => {
+            const message = event.data;
+
+            switch (message.type) {
+                case 'receiveMessage':
+                    addMessage(message.message, 'bot');
+                    break;
+                case 'systemMessage':
+                    addMessage(message.message, 'system');
+                    break;
+                case 'authStatus':
+                    if (message.authenticated) {
+                        statusDiv.textContent = message.userEmail || 'Authenticated';
+                        initButton.classList.add('hidden');
+                        logoutButton.classList.remove('hidden');
+                    } else {
+                        statusDiv.textContent = 'Not initialized';
+                        initButton.classList.remove('hidden');
+                        logoutButton.classList.add('hidden');
+                    }
+                    break;
+                case 'logoutSuccess':
+                    addMessage(message.message, 'system');
+                    statusDiv.textContent = 'Not initialized';
+                    initButton.classList.remove('hidden');
+                    logoutButton.classList.add('hidden');
+                    chatContainer.innerHTML = '';
+                    break;
+            }
+        });
+    </script>
+</body>
+
+</html>

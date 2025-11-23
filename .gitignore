@@ -22,6 +22,7 @@ build/
 !.vscode/launch.json
 !.vscode/extensions.json
 !test_hello_world/.vscode/
+!main_code/.vscode/
 
 # Environment variables
 .env

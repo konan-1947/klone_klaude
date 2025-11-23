@@ -1,0 +1,61 @@
+{
+    "name": "ai-studio-agent",
+    "displayName": "AI Studio Agent",
+    "description": "AI Agent with AI Studio Integration",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.90.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "ai-agent.initialize",
+                "title": "AI Agent: Initialize AI Studio",
+                "category": "AI"
+            },
+            {
+                "command": "ai-agent.logout",
+                "title": "AI Agent: Logout",
+                "category": "AI"
+            }
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "ai-agent-container",
+                    "title": "AI Agent",
+                    "icon": "$(robot)"
+                }
+            ]
+        },
+        "views": {
+            "ai-agent-container": [
+                {
+                    "id": "ai-agent-chat",
+                    "name": "Chat",
+                    "type": "webview"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./"
+    },
+    "dependencies": {
+        "puppeteer": "^21.0.0",
+        "ws": "^8.14.0"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.90.0",
+        "@types/node": "20.x",
+        "@types/ws": "^8.5.0",
+        "typescript": "^5.4.5"
+    }
+}
