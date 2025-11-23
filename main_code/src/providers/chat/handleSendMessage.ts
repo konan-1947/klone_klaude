@@ -9,18 +9,13 @@ export const handleSendMessage = async (
 ): Promise<void> => {
     if (!aiStudioBrowser || !isInitialized) {
         view?.webview.postMessage({
-            type: 'systemMessage',
-            message: '⚠️ Browser chưa được khởi tạo. Nhấn "Initialize Browser" trước.'
+            type: 'error',
+            message: 'Browser chưa được khởi tạo. Nhấn "Initialize" trước.'
         });
         return;
     }
 
     try {
-        view?.webview.postMessage({
-            type: 'systemMessage',
-            message: '⏳ Đang gửi prompt...'
-        });
-
         const response = await aiStudioBrowser.sendPrompt(message);
 
         view?.webview.postMessage({
@@ -29,8 +24,8 @@ export const handleSendMessage = async (
         });
     } catch (error: any) {
         view?.webview.postMessage({
-            type: 'systemMessage',
-            message: `❌ Lỗi: ${error.message}`
+            type: 'error',
+            message: `Lỗi: ${error.message}`
         });
     }
 };
