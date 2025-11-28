@@ -1,0 +1,81 @@
+@startuml
+!theme cerulean-outline
+
+title Complex Request Flow - Refactor Authentication
+
+actor User
+participant "Complexity\nManager" as CM
+participant "Plan\nManager" as PM
+participant "Execution\nManager" as EM
+participant "PTK\nManager" as PTK
+participant "LLM\nManager" as LLM
+participant "Tool\nManager" as TM
+participant "Ignore\nManager" as IM
+participant "Context\nManager" as CTX
+
+User -> CM: "Refactor authentication"
+activate CM
+CM -> CM: heuristicCheck()
+CM -> LLM: llmClassify(request)
+CM --> User: complexity = "complex"
+deactivate CM
+
+User -> PM: generatePlan(request)
+activate PM
+PM -> LLM: generate plan
+PM -> PM: validatePlan()
+PM --> User: Plan with 4 steps
+deactivate PM
+
+User -> EM: execute(plan)
+activate EM
+
+loop for each step in plan
+  EM -> CTX: get(context)
+  
+  alt Step type: LLM
+    EM -> PTK: execute(prompt, tools)
+    activate PTK
+    PTK -> PTK: formatPrompt()
+    PTK -> LLM: call(formattedPrompt)
+    LLM --> PTK: response with tool calls
+    PTK -> PTK: parseResponse()
+    
+    loop tool calling loop
+      PTK -> TM: execute(toolName, params)
+      activate TM
+      TM -> IM: validateAccess(path)
+      IM --> TM: allowed
+      TM -> TM: execute tool
+      TM --> PTK: tool result
+      deactivate TM
+      
+      PTK -> CTX: addMessage(tool result)
+      PTK -> LLM: call(with tool result)
+      LLM --> PTK: next response
+    end
+    
+    PTK --> EM: final response
+    deactivate PTK
+    
+  else Step type: Tool
+    EM -> TM: execute(toolName, params)
+    activate TM
+    TM -> IM: validateAccess(path)
+    IM --> TM: allowed
+    TM --> EM: result
+    deactivate TM
+  end
+  
+  EM -> CTX: update(completedSteps)
+  
+  opt Dynamic update needed
+    EM -> PM: insertStep() / appendStep()
+    PM --> EM: updated plan
+  end
+end
+
+EM --> User: execution complete
+deactivate EM
+
+@enduml

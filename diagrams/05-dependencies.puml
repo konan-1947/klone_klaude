@@ -1,0 +1,64 @@
+@startuml
+!theme cerulean-outline
+
+title Manager Dependencies and Initialization Order
+
+package "Initialization Sequence" {
+  component "1. Context Manager" as CTX1 #lightgreen
+  component "2. Ignore Manager" as IM1 #lightgreen
+  component "3. Tool Manager" as TM1 #lightgreen
+  component "4. LLM Manager" as LLM1 #lightgreen
+  component "5. PTK Manager" as PTK1 #lightyellow
+  component "6. Execution Manager" as EM1 #lightyellow
+  component "7. Plan Manager" as PM1 #lightyellow
+  component "8. Complexity Manager" as CM1 #lightyellow
+}
+
+CTX1 -down-> IM1 : ① Initialize first\n(no dependencies)
+IM1 -down-> TM1 : ② Scan project\nGenerate .aiignore
+TM1 -down-> LLM1 : ③ Register tools
+LLM1 -down-> PTK1 : ④ Register provider
+PTK1 -down-> EM1 : ⑤ Ready for execution
+EM1 -down-> PM1 : ⑥ Can execute plans
+PM1 -down-> CM1 : ⑦ Can generate plans
+
+note right of CTX1
+  No dependencies
+  Pure state storage
+end note
+
+note right of IM1
+  Depends on:
+  - File system
+  Provides:
+  - validateAccess()
+end note
+
+note right of TM1
+  Depends on:
+  - IgnoreManager
+  Provides:
+  - execute()
+  - 5 file operations
+end note
+
+note right of LLM1
+  Depends on:
+  - AIStudioBrowser
+  Provides:
+  - call()
+end note
+
+note right of PTK1
+  Depends on:
+  - LLMManager
+  - ToolManager
+  - ContextManager
+end note
+
+note right of EM1
+  Depends on:
+  - All service managers
+end note
+
+@enduml
