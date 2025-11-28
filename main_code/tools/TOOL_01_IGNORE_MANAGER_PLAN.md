@@ -1,0 +1,895 @@
+# Tool 1: IgnoreManager - Implementation Plan
+
+## Tổng quan
+
+**Mục tiêu:** Tạo IgnoreManager để tự động phát hiện và quản lý files không nên được AI truy cập.
+
+**Base từ:** `ClineIgnoreController` (Cline) + Auto-detection enhancements
+
+**Thời gian:** 3-4 ngày
+
+**Priority:** P1 (Blocker cho ToolManager)
+
+---
+
+## Objectives
+
+### Primary Goals:
+1. ✅ Security: Prevent AI access to sensitive files
+2. ✅ Auto-detection: Tự động phát hiện patterns (node_modules, .env, dist...)
+3. ✅ Smart tracking: Monitor project changes và auto-update
+4. ✅ User control: Support manual `.aiignore` file
+
+### Success Criteria:
+- [x] Auto-scan project khi initialize
+- [x] Generate `.aiignore` với 6 categories
+- [x] Real-time file watcher hoạt động
+- [x] `validateAccess()` chính xác 100%
+- [x] Size-based filtering (>10MB)
+- [x] Pass all test cases
+
+---
+
+## Base Implementation từ Cline
+
+### 📁 Source File:
+```
+cline/src/core/ignore/ClineIgnoreController.ts (259 lines)
+```
+
+### Key Features từ Cline (giữ nguyên):
+
+#### 1. **Ignore Pattern Management**
+```typescript
+private ignoreInstance: Ignore  // npm package 'ignore'
+private clineIgnoreContent: string | undefined
+```
+
+#### 2. **File Watcher**
+```typescript
+private fileWatcher: FSWatcher  // chokidar
+setupFileWatcher() {
+  this.fileWatcher = chokidar.watch(ignorePath, {
+    persistent: true,
+    ignoreInitial: true,
+    awaitWriteFinish: {
+      stabilityThreshold: 100,
+      pollInterval: 100
+    }
+  })
+}
+```
+
+#### 3. **Core APIs**
+```typescript
+async initialize(): Promise<void>
+validateAccess(filePath: string): boolean
+validateCommand(command: string): string | undefined
+filterPaths(paths: string[]): string[]
+async dispose(): Promise<void>
+```
+
+#### 4. **Include Directive Support**
+```typescript
+// Support: !include .gitignore
+private async processClineIgnoreIncludes(content: string)
+```
+
+### Phần giữ nguyên 100%:
+- ✅ `ignore` library integration
+- ✅ File watcher setup
+- ✅ Path normalization
+- ✅ `!include` directive parsing
+- ✅ Command validation (cat, grep commands)
+- ✅ Dispose/cleanup logic
+
+---
+
+## Enhancements (New Features)
+
+### 1. **Auto-Scan Project** 🔍
+
+**Chức năng:** Scan toàn bộ project structure để detect ignore patterns
+
+**Implementation:**
+```typescript
+private async scanProject(projectRoot: string): Promise<string[]> {
+  const patterns = new Set<string>()
+  
+  // Category 1: Dependencies
+  if (await exists(join(projectRoot, 'node_modules'))) {
+    patterns.add('node_modules/')
+  }
+  if (await exists(join(projectRoot, 'vendor'))) {
+    patterns.add('vendor/')
+  }
+  
+  // Category 2: Environment
+  const envFiles = await glob(join(projectRoot, '.env*'))
+  envFiles.forEach(f => patterns.add(basename(f)))
+  
+  if (await exists(join(projectRoot, 'secrets'))) {
+    patterns.add('secrets/')
+  }
+  
+  // Category 3: Build outputs
+  for (const dir of ['dist', 'build', 'out', 'target']) {
+    if (await exists(join(projectRoot, dir))) {
+      patterns.add(dir + '/')
+    }
+  }
+  
+  // Category 4: Cache/Temp
+  for (const dir of ['.cache', 'tmp', 'temp', '.next', '.nuxt']) {
+    if (await exists(join(projectRoot, dir))) {
+      patterns.add(dir + '/')
+    }
+  }
+  
+  // Category 5: VCS
+  for (const dir of ['.git', '.svn', '.hg']) {
+    if (await exists(join(projectRoot, dir))) {
+      patterns.add(dir + '/')
+    }
+  }
+  
+  // Category 6: IDE/Editor
+  for (const dir of ['.vscode', '.idea']) {
+    if (await exists(join(projectRoot, dir))) {
+      patterns.add(dir + '/')
+    }
+  }
+  
+  patterns.add('.DS_Store')
+  patterns.add('*.swp')
+  
+  return Array.from(patterns)
+}
+```
+
+**Effort:** 1 day
+
+---
+
+### 2. **Size-Based Filtering** 📊
+
+**Chức năng:** Auto-ignore folders > 10MB
+
+**Implementation:**
+```typescript
+private async checkFolderSize(dirPath: string): Promise<number> {
+  let size = 0
+  const entries = await fs.readdir(dirPath, {withFileTypes: true})
+  
+  for (const entry of entries) {
+    const fullPath = join(dirPath, entry.name)
+    if (entry.isDirectory()) {
+      size += await this.checkFolderSize(fullPath)
+    } else {
+      const stats = await fs.stat(fullPath)
+      size += stats.size
+    }
+  }
+  
+  return size
+}
+
+private async detectLargeFolders(projectRoot: string): Promise<string[]> {
+  const large = []
+  const MB = 1024 * 1024
+  const threshold = 10 * MB
+  
+  const dirs = await fs.readdir(projectRoot, {withFileTypes: true})
+  for (const dir of dirs.filter(d => d.isDirectory())) {
+    const size = await this.checkFolderSize(join(projectRoot, dir.name))
+    if (size > threshold) {
+      large.push(dir.name + '/')
+    }
+  }
+  
+  return large
+}
+```
+
+**Effort:** 0.5 day
+
+---
+
+### 3. **Generate .aiignore File** 📝
+
+**Chức năng:** Auto-generate categorized `.aiignore` file
+
+**Format:**
+```bash
+# Auto-generated by AI Agent
+# Last updated: 2025-11-28 14:23:20
+# DO NOT EDIT the auto-detected sections unless necessary
+# Add your custom patterns in the "User-defined" section
+
+# === Dependencies (auto-detected) ===
+node_modules/
+vendor/
+.pnpm-store/
+
+# === Environment (auto-detected) ===
+.env
+.env.*
+secrets/
+*.key
+*.pem
+
+# === Build outputs (auto-detected) ===
+dist/
+build/
+out/
+*.min.js
+*.bundle.js
+
+# === Cache/Temp (auto-detected) ===
+.cache/
+tmp/
+temp/
+*.log
+.next/
+.nuxt/
+
+# === Version Control (auto-detected) ===
+.git/
+.svn/
+.hg/
+
+# === IDE/Editor (auto-detected) ===
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# === Large folders (>10MB, auto-detected) ===
+# (Add large folders here if detected)
+
+# === User-defined ===
+# Add your custom ignore patterns below
+# Example:
+# my-secret-folder/
+# *.private
+
+# === Include from other files ===
+!include .gitignore
+```
+
+**Implementation:**
+```typescript
+private async generateAiIgnoreFile(
+  projectRoot: string,
+  detectedPatterns: Map<string, string[]>
+): Promise<void> {
+  const lines: string[] = []
+  
+  // Header
+  lines.push('# Auto-generated by AI Agent')
+  lines.push(`# Last updated: ${new Date().toISOString()}`)
+  lines.push('# DO NOT EDIT the auto-detected sections unless necessary')
+  lines.push('# Add your custom patterns in the "User-defined" section')
+  lines.push('')
+  
+  // Categories
+  const categories = [
+    'Dependencies',
+    'Environment',
+    'Build outputs',
+    'Cache/Temp',
+    'Version Control',
+    'IDE/Editor',
+    'Large folders (>10MB)'
+  ]
+  
+  for (const category of categories) {
+    if (detectedPatterns.has(category) && detectedPatterns.get(category)!.length > 0) {
+      lines.push(`# === ${category} (auto-detected) ===`)
+      detectedPatterns.get(category)!.forEach(pattern => {
+        lines.push(pattern)
+      })
+      lines.push('')
+    }
+  }
+  
+  // User-defined section
+  lines.push('# === User-defined ===')
+  lines.push('# Add your custom ignore patterns below')
+  lines.push('# Example:')
+  lines.push('# my-secret-folder/')
+  lines.push('# *.private')
+  lines.push('')
+  
+  // Include section
+  lines.push('# === Include from other files ===')
+  if (await exists(join(projectRoot, '.gitignore'))) {
+    lines.push('!include .gitignore')
+  }
+  lines.push('')
+  
+  await fs.writeFile(
+    join(projectRoot, '.aiignore'),
+    lines.join('\n'),
+    'utf-8'
+  )
+}
+```
+
+**Effort:** 0.5 day
+
+---
+
+### 4. **Smart Update Logic** 🔄
+
+**Chức năng:** Merge existing user patterns với auto-detected patterns
+
+**Implementation:**
+```typescript
+private async loadExistingPatterns(aiignorePath: string): Promise<{
+  userDefined: string[],
+  autoDetected: Map<string, string[]>
+}> {
+  if (!await exists(aiignorePath)) {
+    return {userDefined: [], autoDetected: new Map()}
+  }
+  
+  const content = await fs.readFile(aiignorePath, 'utf-8')
+  const lines = content.split('\n')
+  
+  let currentSection = 'none'
+  const userDefined: string[] = []
+  const autoDetected = new Map<string, string[]>()
+  
+  for (const line of lines) {
+    const trimmed = line.trim()
+    
+    // Detect section
+    if (trimmed.startsWith('# === ') && trimmed.endsWith('(auto-detected) ===')) {
+      const category = trimmed.replace('# === ', '').replace(' (auto-detected) ===', '')
+      currentSection = category
+      autoDetected.set(category, [])
+    } else if (trimmed === '# === User-defined ===') {
+      currentSection = 'user'
+    } else if (trimmed.startsWith('#') || trimmed === '') {
+      // Skip comments and empty lines
+      continue
+    } else {
+      // Pattern line
+      if (currentSection === 'user') {
+        userDefined.push(trimmed)
+      } else if (autoDetected.has(currentSection)) {
+        autoDetected.get(currentSection)!.push(trimmed)
+      }
+    }
+  }
+  
+  return {userDefined, autoDetected}
+}
+
+private async updateAiIgnoreFile(
+  projectRoot: string,
+  newDetectedPatterns: Map<string, string[]>
+): Promise<void> {
+  const aiignorePath = join(projectRoot, '.aiignore')
+  const {userDefined, autoDetected} = await this.loadExistingPatterns(aiignorePath)
+  
+  // Merge: Keep user-defined, update auto-detected
+  const mergedPatterns = new Map(newDetectedPatterns)
+  
+  await this.generateAiIgnoreFile(projectRoot, mergedPatterns)
+  
+  // Re-append user-defined patterns
+  if (userDefined.length > 0) {
+    const content = await fs.readFile(aiignorePath, 'utf-8')
+    const updated = content.replace(
+      '# === User-defined ===\n# Add your custom ignore patterns below\n# Example:\n# my-secret-folder/\n# *.private',
+      `# === User-defined ===\n${userDefined.join('\n')}`
+    )
+    await fs.writeFile(aiignorePath, updated, 'utf-8')
+  }
+}
+```
+
+**Effort:** 0.5 day
+
+---
+
+### 5. **Enhanced File Watcher** 👁️
+
+**Chức năng:** Monitor changes và auto-update `.aiignore`
+
+**Implementation:**
+```typescript
+private setupEnhancedFileWatcher(projectRoot: string): void {
+  // Watch for new directories
+  const projectWatcher = chokidar.watch(projectRoot, {
+    persistent: true,
+    ignoreInitial: true,
+    depth: 1, // Only top-level
+    ignored: /(^|[\/\\])\../, // Ignore hidden files
+  })
+  
+  // Debounced update
+  let updateTimeout: NodeJS.Timeout | null = null
+  
+  const scheduleUpdate = () => {
+    if (updateTimeout) clearTimeout(updateTimeout)
+    updateTimeout = setTimeout(async () => {
+      await this.rescanAndUpdate(projectRoot)
+    }, 300) // 300ms debounce
+  }
+  
+  projectWatcher.on('addDir', (dirPath) => {
+    const dirName = basename(dirPath)
+    
+    // Check if matches known patterns
+    const knownPatterns = [
+      'node_modules', 'vendor', 'dist', 'build', 'out',
+      '.cache', 'tmp', '.next', '.nuxt'
+    ]
+    
+    if (knownPatterns.includes(dirName)) {
+      console.log(`[IgnoreManager] Detected new folder: ${dirName}`)
+      scheduleUpdate()
+    }
+  })
+  
+  this.projectWatcher = projectWatcher
+}
+
+private async rescanAndUpdate(projectRoot: string): Promise<void> {
+  console.log('[IgnoreManager] Rescanning project...')
+  
+  // Rescan
+  const newPatterns = await this.categorizePatterns(
+    await this.scanProject(projectRoot)
+  )
+  
+  // Update .aiignore
+  await this.updateAiIgnoreFile(projectRoot, newPatterns)
+  
+  // Reload ignore instance
+  await this.loadAiIgnore()
+  
+  console.log('[IgnoreManager] Update complete')
+}
+```
+
+**Effort:** 0.5 day
+
+---
+
+## Detailed Implementation Plan
+
+### **Day 1: Base Implementation**
+
+#### Morning (4h):
+1. **Setup structure** (30min)
+   ```bash
+   mkdir -p src/core/ignore
+   touch src/core/ignore/IgnoreManager.ts
+   touch src/core/ignore/types.ts
+   ```
+
+2. **Copy ClineIgnoreController** (1h)
+   - Copy file từ Cline
+   - Rename class → `IgnoreManager`
+   - Rename `.clineignore` → `.aiignore`
+   - Update imports
+
+3. **Install dependencies** (30min)
+   ```bash
+   npm install ignore chokidar
+   npm install --save-dev @types/chokidar
+   ```
+
+4. **Basic refactoring** (2h)
+   - Remove Cline-specific dependencies
+   - Simplify error handling
+   - Update method signatures
+
+#### Afternoon (4h):
+5. **Core APIs testing** (2h)
+   - Test `initialize()`
+   - Test `validateAccess()`
+   - Test `filterPaths()`
+
+6. **File watcher testing** (2h)
+   - Test watcher setup
+   - Test reload on change
+   - Test disposal
+
+**Day 1 Deliverable:**
+- ✅ Working `IgnoreManager` với base features
+- ✅ Manual `.aiignore` file support
+- ✅ File watcher hoạt động
+
+---
+
+### **Day 2: Auto-Detection**
+
+#### Morning (4h):
+1. **Implement `scanProject()`** (2h)
+   - Detect 6 categories
+   - Return categorized patterns
+
+2. **Implement size-based filtering** (2h)
+   - `checkFolderSize()`
+   - `detectLargeFolders()`
+   - Threshold: 10MB
+
+#### Afternoon (4h):
+3. **Categorize patterns** (1h)
+   ```typescript
+   private categorizePatterns(patterns: string[]): Map<string, string[]> {
+     const categories = new Map<string, string[]>()
+     // Categorization logic
+     return categories
+   }
+   ```
+
+4. **Testing** (3h)
+   - Test với real projects
+   - Verify detection accuracy
+   - Edge cases (empty project, large project)
+
+**Day 2 Deliverable:**
+- ✅ Auto-scan hoạt động
+- ✅ Size-based filtering hoạt động
+- ✅ Patterns được categorize đúng
+
+---
+
+### **Day 3: .aiignore Generation**
+
+#### Morning (4h):
+1. **Implement `generateAiIgnoreFile()`** (2h)
+   - Generate formatted file
+   - Categories + comments
+   - User-defined section
+
+2. **Implement `loadExistingPatterns()`** (2h)
+   - Parse existing `.aiignore`
+   - Preserve user patterns
+   - Extract auto-detected patterns
+
+#### Afternoon (4h):
+3. **Implement `updateAiIgnoreFile()`** (2h)
+   - Merge logic
+   - Preserve user-defined
+   - Update auto-detected
+
+4. **Testing** (2h)
+   - Test generation
+   - Test updates
+   - Test merge logic
+
+**Day 3 Deliverable:**
+- ✅ `.aiignore` auto-generated
+- ✅ User patterns preserved
+- ✅ Smart merge hoạt động
+
+---
+
+### **Day 4: Enhanced Watcher & Polish**
+
+#### Morning (4h):
+1. **Enhanced file watcher** (2h)
+   - Monitor project changes
+   - Debounced updates
+   - Auto-rescan
+
+2. **Notification system** (1h)
+   ```typescript
+   private async notifyUser(message: string): Promise<void> {
+     // VS Code notification
+     vscode.window.showInformationMessage(
+       `[IgnoreManager] ${message}`
+     )
+   }
+   ```
+
+3. **Performance optimization** (1h)
+   - Cache patterns in memory
+   - Lazy loading
+   - Incremental updates
+
+#### Afternoon (4h):
+4. **Comprehensive testing** (2h)
+   - Unit tests
+   - Integration tests
+   - Edge cases
+
+5. **Documentation** (1h)
+   - JSDoc comments
+   - README
+   - Usage examples
+
+6. **Code review & polish** (1h)
+   - Clean up
+   - Error handling
+   - Logging
+
+**Day 4 Deliverable:**
+- ✅ Production-ready `IgnoreManager`
+- ✅ All tests passing
+- ✅ Documentation complete
+
+---
+
+## File Structure
+
+```
+src/core/ignore/
+├── IgnoreManager.ts          # Main class (400-500 lines)
+├── types.ts                  # TypeScript interfaces
+├── constants.ts              # Known patterns, categories
+└── __tests__/
+    ├── IgnoreManager.test.ts
+    ├── scanProject.test.ts
+    └── integration.test.ts
+```
+
+### types.ts
+```typescript
+export interface IgnoreCategory {
+  name: string
+  patterns: string[]
+}
+
+export interface ScanResult {
+  categories: Map<string, string[]>
+  largeFolders: string[]
+  totalPatterns: number
+}
+
+export interface ValidationResult {
+  allowed: boolean
+  reason?: string
+  category?: string
+}
+```
+
+### constants.ts
+```typescript
+export const KNOWN_PATTERNS = {
+  dependencies: ['node_modules', 'vendor', '.pnpm-store', 'bower_components'],
+  environment: ['.env', 'secrets'],
+  build: ['dist', 'build', 'out', 'target'],
+  cache: ['.cache', 'tmp', 'temp', '.next', '.nuxt'],
+  vcs: ['.git', '.svn', '.hg'],
+  ide: ['.vscode', '.idea', '.DS_Store']
+}
+
+export const SIZE_THRESHOLD_MB = 10
+```
+
+---
+
+## Testing Strategy
+
+### Unit Tests
+
+```typescript
+// __tests__/IgnoreManager.test.ts
+describe('IgnoreManager', () => {
+  describe('scanProject', () => {
+    it('should detect node_modules', async () => {
+      const patterns = await manager.scanProject(testProject)
+      expect(patterns).toContain('node_modules/')
+    })
+    
+    it('should detect .env files', async () => {
+      const patterns = await manager.scanProject(testProject)
+      expect(patterns).toContain('.env')
+    })
+  })
+  
+  describe('validateAccess', () => {
+    it('should block node_modules access', () => {
+      const allowed = manager.validateAccess('node_modules/lib.js')
+      expect(allowed).toBe(false)
+    })
+    
+    it('should allow src files', () => {
+      const allowed = manager.validateAccess('src/index.ts')
+      expect(allowed).toBe(true)
+    })
+  })
+  
+  describe('size-based filtering', () => {
+    it('should detect large folders', async () => {
+      const large = await manager.detectLargeFolders(testProject)
+      expect(large).toContain('large-folder/')
+    })
+  })
+})
+```
+
+### Integration Tests
+
+```typescript
+describe('IgnoreManager Integration', () => {
+  it('should auto-generate .aiignore on initialize', async () => {
+    await manager.initialize(testProject)
+    
+    const aiignore = await fs.readFile(
+      join(testProject, '.aiignore'),
+      'utf-8'
+    )
+    
+    expect(aiignore).toContain('# === Dependencies')
+    expect(aiignore).toContain('node_modules/')
+  })
+  
+  it('should preserve user patterns on update', async () => {
+    // Initialize with user patterns
+    await fs.writeFile(
+      join(testProject, '.aiignore'),
+      '# === User-defined ===\nmy-secret/'
+    )
+    
+    // Auto-update
+    await manager.rescanAndUpdate(testProject)
+    
+    const updated = await fs.readFile(
+      join(testProject, '.aiignore'),
+      'utf-8'
+    )
+    
+    expect(updated).toContain('my-secret/')
+  })
+})
+```
+
+---
+
+## Dependencies
+
+### NPM Packages:
+```json
+{
+  "dependencies": {
+    "ignore": "^5.3.0",
+    "chokidar": "^3.5.3"
+  },
+  "devDependencies": {
+    "@types/chokidar": "^2.1.3"
+  }
+}
+```
+
+### Internal Dependencies:
+- `vscode` API (for notifications)
+- `fs/promises` (file operations)
+- `path` (path utilities)
+
+---
+
+## Risk Assessment
+
+### High Risk:
+- 🔴 **Performance**: Scanning large projects (>10k files)
+  - **Mitigation**: Lazy loading, cache, incremental scans
+
+- 🔴 **False positives**: Auto-detect ngẫu nhiên folders
+  - **Mitigation**: Whitelist known patterns only
+
+### Medium Risk:
+- ⚠️ **Size calculation**: Slow cho large folders
+  - **Mitigation**: Timeout, skip folders >100MB
+
+- ⚠️ **File watcher**: Memory leak
+  - **Mitigation**: Proper disposal, limit watch depth
+
+### Low Risk:
+- ✅ **Merge logic**: Conflict giữa auto vs user
+  - **Mitigation**: User-defined always prioritized
+
+---
+
+## Success Metrics
+
+### Performance:
+- [ ] Scan 1000 files < 3 seconds
+- [ ] Cache hit rate > 90%
+- [ ] Memory usage < 50MB
+
+### Accuracy:
+- [ ] 0 false negatives (blocked files leaked)
+- [ ] < 5% false positives (valid files blocked)
+
+### Usability:
+- [ ] `.aiignore` readable
+- [ ] Auto-update không spam user
+- [ ] Easy to override
+
+---
+
+## Next Steps
+
+**After IgnoreManager complete:**
+
+1. **ToolManager Integration** (Week 1, Days 5-7)
+   ```typescript
+   class ToolManager {
+     constructor(private ignoreManager: IgnoreManager) {}
+     
+     async execute(tool, params) {
+       if (!this.ignoreManager.validateAccess(params.path)) {
+         throw new Error('Access denied')
+       }
+       // ...
+     }
+   }
+   ```
+
+2. **Testing với Real Projects**
+   - Test với main_code project
+   - Test với Cline project
+   - Test với large monorepos
+
+3. **Documentation**
+   - User guide: How to customize `.aiignore`
+   - Developer guide: How to integrate
+
+---
+
+## Appendix
+
+### Example .aiignore Output:
+
+```bash
+# Auto-generated by AI Agent
+# Last updated: 2025-11-28 14:23:20
+
+# === Dependencies (auto-detected) ===
+node_modules/
+vendor/
+
+# === Environment (auto-detected) ===
+.env
+.env.local
+secrets/
+
+# === Build outputs (auto-detected) ===
+dist/
+out/
+
+# === Cache/Temp (auto-detected) ===
+.cache/
+tmp/
+
+# === Version Control (auto-detected) ===
+.git/
+
+# === IDE/Editor (auto-detected) ===
+.vscode/
+.idea/
+
+# === User-defined ===
+# Add your patterns here
+
+# === Include from other files ===
+!include .gitignore
+```
+
+### Integration Example:
+
+```typescript
+// In main execution
+const ignoreManager = new IgnoreManager(workspaceRoot)
+await ignoreManager.initialize()
+
+// Check access before tool execution
+if (!ignoreManager.validateAccess('src/file.ts')) {
+  throw new Error('Access denied by .aiignore')
+}
+```
+
+---
+
+**Status:** Ready to implement
+**Start Date:** TBD
+**Estimated Completion:** 3-4 days

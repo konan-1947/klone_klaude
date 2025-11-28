@@ -1,0 +1,72 @@
+@startuml
+!theme cerulean-outline
+
+title Ignore Manager - Auto-Detection Flow
+
+participant "Ignore\nManager" as IM
+participant "File\nSystem" as FS
+participant ".aiignore" as AI
+participant "File\nWatcher" as FW
+
+-> IM: initialize(projectRoot)
+activate IM
+
+IM -> FS: scanProject()
+activate FS
+
+FS -> FS: detect node_modules/
+FS -> FS: detect .env files
+FS -> FS: detect dist/
+FS -> FS: detect large folders (>10MB)
+FS --> IM: detected patterns:\n- node_modules/\n- .env*\n- dist/\n- build/
+deactivate FS
+
+IM -> AI: load existing .aiignore
+activate AI
+AI --> IM: existing patterns
+deactivate AI
+
+IM -> IM: merge patterns
+IM -> IM: categorize patterns:\n- Dependencies\n- Environment\n- Build\n- Cache
+
+IM -> AI: updateIgnoreFile()
+activate AI
+note right
+  # Auto-generated
+  # === Dependencies ===
+  node_modules/
+  
+  # === Environment ===
+  .env*
+  
+  # === Build ===
+  dist/
+end note
+AI --> IM: file written
+deactivate AI
+
+IM -> FW: setupFileWatcher()
+activate FW
+FW -> FW: watch project changes
+note right FW
+  Debounced updates
+  (300ms delay)
+end note
+deactivate FW
+
+IM -> IM: cache patterns in memory
+
+<-- IM: initialized
+deactivate IM
+
+... later ...
+
+FW -> IM: file change detected:\nnew folder "vendor/"
+activate IM
+IM -> IM: pattern matches:\n"vendor/" -> Dependencies
+IM -> AI: append to .aiignore
+IM -> IM: update cache
+IM -> IM: notify user
+deactivate IM
+
+@enduml

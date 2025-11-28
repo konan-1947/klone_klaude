@@ -8,6 +8,7 @@ Hệ thống gồm 6 Managers chính, hoạt động theo workflow tuyến tính
 
 ## Architecture Diagram
 
+
 ```
 User Request (VS Code)
     ↓
@@ -33,19 +34,19 @@ User Request (VS Code)
 │ - Track progress                    │
 └─────────────────────────────────────┘
     ↓
-    ├──────────────┬──────────────┬─────────────┐
-    ↓              ↓              ↓             ↓
-┌────────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
-│    PTK     │ │   LLM   │ │  TOOL   │ │ CONTEXT │
-│  MANAGER   │ │ MANAGER │ │ MANAGER │ │ MANAGER │
-│            │ │         │ │         │ │         │
-│ - Format   │ │ - Call  │ │ - Exec  │ │ - State │
-│ - Parse    │ │   LLM   │ │   tools │ │   store │
-│ - Tool loop│ │         │ │         │ │         │
-└────────────┘ └─────────┘ └─────────┘ └─────────┘
-    │               ↑            ↑            ↑
-    └───────────────┴────────────┴────────────┘
-         PTK uses LLM, Tool, Context
+    ├──────────────┬──────────────┬─────────────┬──────────────┐
+    ↓              ↓              ↓             ↓              ↓
+┌────────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌──────────────┐
+│    PTK     │ │   LLM   │ │  TOOL   │ │ CONTEXT │ │   IGNORE     │
+│  MANAGER   │ │ MANAGER │ │ MANAGER │ │ MANAGER │ │   MANAGER    │
+│            │ │         │ │         │ │         │ │              │
+│ - Format   │ │ - Call  │ │ - Exec  │ │ - State │ │ - Auto scan  │
+│ - Parse    │ │   LLM   │ │   tools │ │   store │ │ - Track chg  │
+│ - Tool loop│ │         │ │    ↑    │ │         │ │ - .aiignore  │
+└────────────┘ └─────────┘ └────┼────┘ └─────────┘ └──────┬───────┘
+                                │                         │
+                                └─────────────────────────┘
+                                     Tool uses Ignore
     ↓
 Show Result (Inline Diff)
 ```
@@ -58,6 +59,7 @@ Show Result (Inline Diff)
 - **LLM Manager**: Gọi LLM providers (AI Studio, OpenAI, etc.)
 - **Tool Manager**: Execute tools (read_file, search_code, etc.)
 - **Context Manager**: Quản lý state/context cho agent
+- **Ignore Manager**: Tự động phát hiện & quản lý files không nên đọc (libraries, env, build...)
 
 ---
 
@@ -293,6 +295,253 @@ Context {
 - `set(key, value)` → void
 - `update(updates)` → void
 - `merge(newContext)` → void
+
+---
+
+### 8. Ignore Manager 🔒
+
+**Responsibilities**:
+- Tự động phát hiện và track những files không nên đọc
+- Quản lý `.aiignore` file (tự động generate và update)
+- Monitor project changes và cập nhật ignore list
+- Validate file access trước khi tools thực thi
+
+**Input**:
+- Project root path
+- File system changes (via watcher)
+
+**Output**:
+```
+{
+  allowed: boolean
+  reason?: string
+  category?: "library" | "env" | "build" | "cache" | "sensitive"
+}
+```
+
+**Methods**:
+- `initialize()` → Scan project + load .aiignore
+- `scanProject()` → Phát hiện auto-ignore patterns
+- `validateAccess(path)` → Check if file accessible
+- `updateIgnoreFile()` → Update .aiignore với patterns mới
+- `watchFileChanges()` → Monitor và auto-update
+- `getIgnoreCategories()` → List categories of ignored files
+- `dispose()` → Cleanup watchers
+
+**Auto-Detection Categories**:
+
+1. **Dependencies/Libraries**:
+   ```
+   node_modules/
+   vendor/
+   packages/
+   .pnpm-store/
+   bower_components/
+   ```
+
+2. **Environment/Config**:
+   ```
+   .env
+   .env.*
+   secrets/
+   *.key
+   *.pem
+   config.local.*
+   ```
+
+3. **Build Outputs**:
+   ```
+   dist/
+   build/
+   out/
+   target/
+   *.min.js
+   *.bundle.js
+   ```
+
+4. **Cache/Temp**:
+   ```
+   .cache/
+   tmp/
+   temp/
+   *.log
+   .next/
+   .nuxt/
+   ```
+
+5. **Version Control**:
+   ```
+   .git/
+   .svn/
+   .hg/
+   ```
+
+6. **IDE/Editor**:
+   ```
+   .vscode/
+   .idea/
+   *.swp
+   .DS_Store
+   ```
+
+**Features**:
+
+**1. Initial Scan**:
+```
+1. Đọc toàn bộ project structure
+2. Detect patterns (node_modules, .env, etc.)
+3. Generate initial .aiignore file
+4. Load existing .gitignore (optional merge)
+```
+
+**2. Real-time Monitoring**:
+```
+1. Watch file system changes
+2. Detect new directories/files matching patterns
+3. Auto-update .aiignore
+4. Notify user về updates
+```
+
+**3. Smart Detection**:
+- **Size-based**: Auto-ignore folders > 10MB
+- **Pattern-based**: Match known library/build patterns  
+- **Extension-based**: Binary files, compiled outputs
+- **Convention-based**: Standard framework directories
+
+**4. User Control**:
+- Manual overrides in `.aiignore`
+- Whitelist patterns với `!`
+- Include từ files khác: `!include .gitignore`
+- Comments và organization
+
+**.aiignore File Format**:
+```bash
+# Auto-generated by AI Agent
+# Last updated: 2025-11-28 11:14:25
+
+# === Dependencies (auto-detected) ===
+node_modules/
+.pnpm-store/
+
+# === Environment (auto-detected) ===
+.env
+.env.*
+secrets/
+
+# === Build outputs (auto-detected) ===
+dist/
+*.min.js
+
+# === User-defined ===
+# Add your custom patterns here
+my-secret-folder/
+
+# === Include from other files ===
+!include .gitignore
+```
+
+**Integration với Tool Manager**:
+```
+Tool Manager calls:
+  1. ignoreManager.validateAccess(path)
+  2. If denied → return error to LLM
+  3. If allowed → proceed with tool execution
+```
+
+**Workflow**:
+```
+┌─────────────────────────────────────┐
+│ 1. Initialize                       │
+│    - Scan project                   │
+│    - Generate .aiignore             │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│ 2. Monitor Changes                  │
+│    - File watcher active            │
+│    - Detect new patterns            │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│ 3. Auto-Update                      │
+│    - Add new patterns               │
+│    - Update .aiignore               │
+│    - Notify user                    │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│ 4. Validate Access                  │
+│    - Called by Tool Manager         │
+│    - Check against ignore rules     │
+│    - Return allowed/denied          │
+└─────────────────────────────────────┘
+```
+
+**Performance**:
+- Cache ignore patterns in memory
+- Debounce file watcher updates (300ms)
+- Incremental updates (không rescan toàn bộ)
+- Lazy loading cho large projects
+
+**Security**:
+- Self-ignore: `.aiignore` không thể bị AI đọc
+- Fail-safe: Nếu không có file → allow all
+- Override protection: User-defined patterns prioritized
+
+**Example Implementation**:
+```typescript
+class IgnoreManager {
+  private ignorePatterns: Set<string>
+  private fileWatcher: FileWatcher
+  private ignoreCache: Map<string, boolean>
+  
+  async initialize(projectRoot: string) {
+    // 1. Scan project
+    const patterns = await this.scanProject(projectRoot)
+    
+    // 2. Load existing .aiignore
+    const existingPatterns = await this.loadAiIgnore()
+    
+    // 3. Merge patterns
+    this.ignorePatterns = new Set([...patterns, ...existingPatterns])
+    
+    // 4. Generate/update .aiignore
+    await this.updateIgnoreFile()
+    
+    // 5. Setup file watcher
+    this.setupFileWatcher(projectRoot)
+  }
+  
+  validateAccess(filePath: string): boolean {
+    // Check cache first
+    if (this.ignoreCache.has(filePath)) {
+      return this.ignoreCache.get(filePath)!
+    }
+    
+    // Check against patterns
+    const allowed = !this.matchesAnyPattern(filePath)
+    this.ignoreCache.set(filePath, allowed)
+    return allowed
+  }
+  
+  private async scanProject(root: string) {
+    const patterns = new Set<string>()
+    
+    // Detect node_modules
+    if (await exists(join(root, 'node_modules'))) {
+      patterns.add('node_modules/')
+    }
+    
+    // Detect .env files
+    const envFiles = await glob(join(root, '.env*'))
+    envFiles.forEach(f => patterns.add(basename(f)))
+    
+    // ... more detection logic
+    
+    return Array.from(patterns)
+  }
+}
+```
 
 ---
 
@@ -550,12 +799,14 @@ onExecutionEnd → Show final diff
 - LLM Manager (chatbot automation)
 - Tool Manager (basic tools)
 - Context Manager
+- **Ignore Manager** (auto-detect + .aiignore)
 
 **Features**:
 - Simple path (direct execution)
 - Complex path (template plans)
 - Basic error handling
 - Inline diff
+- **Auto file ignore với security** (.aiignore auto-generation)
 
 ---
 
@@ -567,6 +818,7 @@ onExecutionEnd → Show final diff
 - Advanced error handling
 - More tools
 - Better callbacks
+- **Ignore Manager enhancements**: LLM-suggested ignore patterns
 
 ---
 
@@ -577,12 +829,13 @@ onExecutionEnd → Show final diff
 - Metrics
 - Optimization
 - Advanced UI
+- **Smart ignore analytics**: Usage statistics, optimization suggestions
 
 ---
 
 ## Summary
 
-**6 Managers**: Complexity, Plan, Execution, LLM, Tool, Context
+**8 Managers**: Complexity, Plan, Execution, PTK, LLM, Tool, Context, **Ignore**
 
 **2 Paths**: Simple (1 LLM call) vs Complex (multiple steps)
 
@@ -591,3 +844,5 @@ onExecutionEnd → Show final diff
 **Linear Execution**: Steps execute tuần tự, không có loops/branches trong structure
 
 **Callbacks**: Events cho progress tracking, logging, UI updates
+
+**Security**: Ignore Manager tự động phát hiện và protect sensitive files

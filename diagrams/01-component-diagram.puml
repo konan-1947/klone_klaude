@@ -1,0 +1,107 @@
+@startuml
+!theme cerulean-outline
+
+title AI Agent System - 8 Managers Architecture
+
+package "User Interface" {
+  [VS Code Extension] as VSCode
+}
+
+package "Core Managers" {
+  component "Complexity Manager" as CM {
+    port "assessComplexity" as CM_assess
+  }
+  
+  component "Plan Manager" as PM {
+    port "generatePlan" as PM_gen
+    port "updatePlan" as PM_update
+  }
+  
+  component "Execution Manager" as EM {
+    port "execute" as EM_exec
+    port "executeStep" as EM_step
+  }
+}
+
+package "Service Managers" {
+  component "PTK Manager" as PTK {
+    port "execute" as PTK_exec
+    port "formatPrompt" as PTK_format
+    port "parseResponse" as PTK_parse
+  }
+  
+  component "LLM Manager" as LLM {
+    port "call" as LLM_call
+  }
+  
+  component "Tool Manager" as TM {
+    port "execute" as TM_exec
+    port "validateAccess" as TM_validate
+  }
+  
+  component "Context Manager" as CTX {
+    port "get/set" as CTX_data
+  }
+  
+  component "Ignore Manager" as IM {
+    port "validateAccess" as IM_validate
+    port "scanProject" as IM_scan
+  }
+}
+
+package "External" {
+  database ".aiignore" as aiignore
+  database "Project Files" as files
+  cloud "AI Studio" as ai
+}
+
+' Connections
+VSCode --> CM_assess : user request
+CM --> PM_gen : complexity result
+PM --> EM_exec : execution plan
+EM --> EM_step : execute steps
+
+' Service layer connections
+EM --> PTK_exec : call PTK
+EM --> LLM_call : direct LLM call
+EM --> TM_exec : execute tools
+
+' PTK dependencies
+PTK --> LLM_call : call LLM
+PTK --> TM_exec : execute tools
+PTK --> CTX_data : read/write context
+
+' Tool Manager dependencies
+TM --> IM_validate : check access
+TM --> files : read/write files
+
+' Ignore Manager
+IM --> aiignore : read/write rules
+IM --> files : scan project
+
+' LLM to external
+LLM --> ai : API calls
+
+' Context access
+CM ..> CTX_data
+PM ..> CTX_data
+EM ..> CTX_data
+
+note right of IM
+  **Auto-detection features:**
+  - Scan project structure
+  - Detect patterns
+  - Generate .aiignore
+  - Monitor changes
+end note
+
+note right of TM
+  **5 File Operations:**
+  - read_file
+  - write_to_file
+  - replace_in_file
+  - list_files
+  - search_files
+end note
+
+@enduml

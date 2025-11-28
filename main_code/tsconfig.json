@@ -9,6 +9,16 @@
         ],
         "sourceMap": true,
         "rootDir": "src",
-        "strict": true
-    }
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "types": [
+            "jest",
+            "node"
+        ]
+    },
+    "exclude": [
+        "test-files",
+        "node_modules"
+    ]
 }
