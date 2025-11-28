@@ -46,6 +46,25 @@
                     "type": "webview"
                 }
             ]
+        },
+        "configuration": {
+            "title": "AI Agent",
+            "properties": {
+                "ai-agent.ptkMode": {
+                    "type": "string",
+                    "enum": [
+                        "standard",
+                        "optimized"
+                    ],
+                    "default": "optimized",
+                    "description": "PTK execution mode"
+                },
+                "ai-agent.groqApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Groq API key (get from https://console.groq.com)"
+                }
+            }
         }
     },
     "scripts": {
@@ -55,6 +74,7 @@
     },
     "dependencies": {
         "chokidar": "^5.0.0",
+        "dotenv": "^17.2.3",
         "ignore": "^7.0.5",
         "puppeteer": "^21.0.0",
         "ws": "^8.14.0"

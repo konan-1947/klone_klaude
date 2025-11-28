@@ -1,9 +1,15 @@
 import * as vscode from 'vscode';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 import { ChatViewProvider } from './providers/chat/ChatViewProvider';
 import { CookieManager } from './core/cookie/CookieManager';
 import { ToolManager } from './core/tools';
 import { IgnoreManager } from './core/ignore/IgnoreManager';
 import { TestToolViewProvider } from './providers/test/TestToolViewProvider';
+
+// Load environment variables from .env file
+// Use __dirname to get the correct path in compiled extension
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 let chatProvider: ChatViewProvider;
 

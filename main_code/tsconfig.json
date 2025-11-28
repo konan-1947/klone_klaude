@@ -16,5 +16,9 @@
             "jest",
             "node"
         ]
-    }
+    },
+    "exclude": [
+        "test-files",
+        "node_modules"
+    ]
 }

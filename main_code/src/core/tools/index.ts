@@ -1,13 +1,11 @@
 /**
- * Tools module exports
+ * Tools Module Exports
  */
 
-export { ToolManager } from './ToolManager';
-export { BaseHandler } from './handlers/BaseHandler';
-export { ReadFileHandler } from './handlers/ReadFileHandler';
-export { AccessDeniedError, ToolError } from './errors';
-export type {
-    ToolResponse,
-    ReadFileParams,
-    ReadFileResponse
-} from './types';
+export * from './types';
+export * from './errors';
+export * from './ToolManager';
+export * from './ToolRegistry';
+export * from './BatchFileReader';
+export * from './handlers/BaseHandler';
+export * from './handlers/ReadFileHandler';
