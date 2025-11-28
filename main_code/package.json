@@ -49,13 +49,19 @@
         "watch": "tsc -watch -p ./"
     },
     "dependencies": {
+        "chokidar": "^5.0.0",
+        "ignore": "^7.0.5",
         "puppeteer": "^21.0.0",
         "ws": "^8.14.0"
     },
     "devDependencies": {
-        "@types/vscode": "^1.90.0",
+        "@types/chokidar": "^1.7.5",
+        "@types/jest": "^30.0.0",
         "@types/node": "20.x",
+        "@types/vscode": "^1.90.0",
         "@types/ws": "^8.5.0",
+        "jest": "^30.2.0",
+        "ts-jest": "^29.4.5",
         "typescript": "^5.4.5"
     }
 }
