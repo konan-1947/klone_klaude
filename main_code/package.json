@@ -39,6 +39,11 @@
                     "id": "ai-agent-chat",
                     "name": "Chat",
                     "type": "webview"
+                },
+                {
+                    "id": "ai-agent-test-tool",
+                    "name": "Test Tool",
+                    "type": "webview"
                 }
             ]
         }
