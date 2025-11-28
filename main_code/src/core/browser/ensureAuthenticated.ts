@@ -23,7 +23,7 @@ export const ensureAuthenticated = async (
 
         if (isValid) {
             logger.info('Session restored successfully');
-            // Thu nhỏ cửa sổ browser sau khi restore session
+            // Minimize cửa sổ browser sau khi restore session
             try {
                 const target = page.target();
                 const session = await target.createCDPSession();
@@ -31,15 +31,12 @@ export const ensureAuthenticated = async (
                 await session.send('Browser.setWindowBounds', {
                     windowId,
                     bounds: {
-                        left: 0,
-                        top: 0,
-                        width: 400,
-                        height: 300
+                        windowState: 'minimized'
                     }
                 });
                 await session.detach();
             } catch (err) {
-                logger.debug('Could not resize window');
+                logger.debug('Could not minimize window');
             }
             return;
         } else {
@@ -50,7 +47,7 @@ export const ensureAuthenticated = async (
 
     await performManualLogin(page, cookieManager);
 
-    // Thu nhỏ cửa sổ browser sau khi login xong
+    // Minimize cửa sổ browser sau khi login xong
     try {
         const target = page.target();
         const session = await target.createCDPSession();
@@ -58,14 +55,11 @@ export const ensureAuthenticated = async (
         await session.send('Browser.setWindowBounds', {
             windowId,
             bounds: {
-                left: 0,
-                top: 0,
-                width: 400,
-                height: 300
+                windowState: 'minimized'
             }
         });
         await session.detach();
     } catch (err) {
-        logger.debug('Could not resize window');
+        logger.debug('Could not minimize window');
     }
 };
