@@ -1,0 +1,566 @@
+@startuml System Architecture - Component Diagram
+!theme cerulean-outline
+
+title AI Agent System - 8 Managers Architecture
+
+package "User Interface" {
+  [VS Code Extension] as VSCode
+}
+
+package "Core Managers" {
+  component "Complexity Manager" as CM {
+    port "assessComplexity" as CM_assess
+  }
+  
+  component "Plan Manager" as PM {
+    port "generatePlan" as PM_gen
+    port "updatePlan" as PM_update
+  }
+  
+  component "Execution Manager" as EM {
+    port "execute" as EM_exec
+    port "executeStep" as EM_step
+  }
+}
+
+package "Service Managers" {
+  component "PTK Manager" as PTK {
+    port "execute" as PTK_exec
+    port "formatPrompt" as PTK_format
+    port "parseResponse" as PTK_parse
+  }
+  
+  component "LLM Manager" as LLM {
+    port "call" as LLM_call
+  }
+  
+  component "Tool Manager" as TM {
+    port "execute" as TM_exec
+    port "validateAccess" as TM_validate
+  }
+  
+  component "Context Manager" as CTX {
+    port "get/set" as CTX_data
+  }
+  
+  component "Ignore Manager" as IM {
+    port "validateAccess" as IM_validate
+    port "scanProject" as IM_scan
+  }
+}
+
+package "External" {
+  database ".aiignore" as aiignore
+  database "Project Files" as files
+  cloud "AI Studio" as ai
+}
+
+' Connections
+VSCode --> CM_assess : user request
+CM --> PM_gen : complexity result
+PM --> EM_exec : execution plan
+EM --> EM_step : execute steps
+
+' Service layer connections
+EM --> PTK_exec : call PTK
+EM --> LLM_call : direct LLM call
+EM --> TM_exec : execute tools
+
+' PTK dependencies
+PTK --> LLM_call : call LLM
+PTK --> TM_exec : execute tools
+PTK --> CTX_data : read/write context
+
+' Tool Manager dependencies
+TM --> IM_validate : check access
+TM --> files : read/write files
+
+' Ignore Manager
+IM --> aiignore : read/write rules
+IM --> files : scan project
+
+' LLM to external
+LLM --> ai : API calls
+
+' Context access
+CM ..> CTX_data
+PM ..> CTX_data
+EM ..> CTX_data
+
+note right of IM
+  **Auto-detection features:**
+  - Scan project structure
+  - Detect patterns
+  - Generate .aiignore
+  - Monitor changes
+end note
+
+note right of TM
+  **5 File Operations:**
+  - read_file
+  - write_to_file
+  - replace_in_file
+  - list_files
+  - search_files
+end note
+
+@enduml
+
+@startuml System Flow - Sequence Diagram
+!theme cerulean-outline
+
+title Simple Request Flow (e.g., "Rename variable")
+
+actor User
+participant "VS Code" as VSCode
+participant "Complexity\nManager" as CM
+participant "Execution\nManager" as EM
+participant "LLM\nManager" as LLM
+participant "Tool\nManager" as TM
+participant "Ignore\nManager" as IM
+participant "Context\nManager" as CTX
+participant "AI Studio" as AI
+
+User -> VSCode: "Rename variable x to y"
+activate VSCode
+
+VSCode -> CM: assessComplexity(request)
+activate CM
+CM -> CTX: get(projectInfo)
+CTX --> CM: project context
+CM --> VSCode: complexity = "simple"
+deactivate CM
+
+VSCode -> EM: execute(simple path)
+activate EM
+
+EM -> CTX: set(userRequest, ...)
+EM -> LLM: call(prompt)
+activate LLM
+LLM -> AI: sendPrompt(prompt)
+AI --> LLM: response
+LLM --> EM: refactored code
+deactivate LLM
+
+EM -> TM: execute(write_to_file)
+activate TM
+TM -> IM: validateAccess(filePath)
+activate IM
+IM --> TM: allowed = true
+deactivate IM
+TM -> TM: write file
+TM --> EM: success
+deactivate TM
+
+EM -> CTX: update(completedActions)
+EM --> VSCode: result
+deactivate EM
+
+VSCode --> User: Show inline diff
+deactivate VSCode
+
+@enduml
+
+@startuml Complex Request Flow
+!theme cerulean-outline
+
+title Complex Request Flow (e.g., "Refactor authentication")
+
+actor User
+participant "Complexity\nManager" as CM
+participant "Plan\nManager" as PM
+participant "Execution\nManager" as EM
+participant "PTK\nManager" as PTK
+participant "LLM\nManager" as LLM
+participant "Tool\nManager" as TM
+participant "Ignore\nManager" as IM
+participant "Context\nManager" as CTX
+
+User -> CM: "Refactor authentication"
+activate CM
+CM -> CM: heuristicCheck()
+CM -> LLM: llmClassify(request)
+CM --> User: complexity = "complex"
+deactivate CM
+
+User -> PM: generatePlan(request)
+activate PM
+PM -> LLM: generate plan
+PM -> PM: validatePlan()
+PM --> User: Plan with 4 steps
+deactivate PM
+
+User -> EM: execute(plan)
+activate EM
+
+loop for each step in plan
+  EM -> CTX: get(context)
+  
+  alt Step type: LLM
+    EM -> PTK: execute(prompt, tools)
+    activate PTK
+    PTK -> PTK: formatPrompt()
+    PTK -> LLM: call(formattedPrompt)
+    LLM --> PTK: response with tool calls
+    PTK -> PTK: parseResponse()
+    
+    loop tool calling loop
+      PTK -> TM: execute(toolName, params)
+      activate TM
+      TM -> IM: validateAccess(path)
+      IM --> TM: allowed
+      TM -> TM: execute tool
+      TM --> PTK: tool result
+      deactivate TM
+      
+      PTK -> CTX: addMessage(tool result)
+      PTK -> LLM: call(with tool result)
+      LLM --> PTK: next response
+    end
+    
+    PTK --> EM: final response
+    deactivate PTK
+    
+  else Step type: Tool
+    EM -> TM: execute(toolName, params)
+    activate TM
+    TM -> IM: validateAccess(path)
+    IM --> TM: allowed
+    TM --> EM: result
+    deactivate TM
+  end
+  
+  EM -> CTX: update(completedSteps)
+  
+  opt Dynamic update needed
+    EM -> PM: insertStep() / appendStep()
+    PM --> EM: updated plan
+  end
+end
+
+EM --> User: execution complete
+deactivate EM
+
+@enduml
+
+@startuml Ignore Manager Initialization
+!theme cerulean-outline
+
+title Ignore Manager - Auto-Detection Flow
+
+participant "Ignore\nManager" as IM
+participant "File\nSystem" as FS
+participant ".aiignore" as AI
+participant "File\nWatcher" as FW
+
+-> IM: initialize(projectRoot)
+activate IM
+
+IM -> FS: scanProject()
+activate FS
+
+FS -> FS: detect node_modules/
+FS -> FS: detect .env files
+FS -> FS: detect dist/
+FS -> FS: detect large folders (>10MB)
+FS --> IM: detected patterns:\n- node_modules/\n- .env*\n- dist/\n- build/
+deactivate FS
+
+IM -> AI: load existing .aiignore
+activate AI
+AI --> IM: existing patterns
+deactivate AI
+
+IM -> IM: merge patterns
+IM -> IM: categorize patterns:\n- Dependencies\n- Environment\n- Build\n- Cache
+
+IM -> AI: updateIgnoreFile()
+activate AI
+note right
+  # Auto-generated
+  # === Dependencies ===
+  node_modules/
+  
+  # === Environment ===
+  .env*
+  
+  # === Build ===
+  dist/
+end note
+AI --> IM: file written
+deactivate AI
+
+IM -> FW: setupFileWatcher()
+activate FW
+FW -> FW: watch project changes
+note right FW
+  Debounced updates
+  (300ms delay)
+end note
+deactivate FW
+
+IM -> IM: cache patterns in memory
+
+<-- IM: initialized
+deactivate IM
+
+... later ...
+
+FW -> IM: file change detected:\nnew folder "vendor/"
+activate IM
+IM -> IM: pattern matches:\n"vendor/" → Dependencies
+IM -> AI: append to .aiignore
+IM -> IM: update cache
+IM -> IM: notify user
+deactivate IM
+
+@enduml
+
+@startuml Tool Manager - File Operations
+!theme cerulean-outline
+
+title Tool Manager - File Operation with Security
+
+participant "Execution\nManager" as EM
+participant "Tool\nManager" as TM
+participant "Ignore\nManager" as IM
+participant "ReadFile\nHandler" as RF
+participant "File System" as FS
+
+EM -> TM: execute("read_file", {path: "src/auth.ts"})
+activate TM
+
+TM -> TM: validateToolCall(params)
+
+TM -> IM: validateAccess("src/auth.ts")
+activate IM
+IM -> IM: check against patterns
+IM -> IM: check cache
+IM --> TM: {allowed: true}
+deactivate IM
+
+TM -> TM: getHandler("read_file")
+TM -> RF: execute({path: "src/auth.ts"})
+activate RF
+
+RF -> RF: resolveAbsolutePath()
+RF -> FS: readFile("src/auth.ts")
+activate FS
+FS --> RF: file content
+deactivate FS
+
+RF --> TM: {success: true, data: content}
+deactivate RF
+
+TM --> EM: tool result
+deactivate TM
+
+... blocked file example ...
+
+EM -> TM: execute("read_file", {path: "node_modules/lib.js"})
+activate TM
+
+TM -> IM: validateAccess("node_modules/lib.js")
+activate IM
+IM -> IM: matches pattern: "node_modules/"
+IM --> TM: {\n  allowed: false,\n  reason: "Blocked by .aiignore",\n  category: "library"\n}
+deactivate IM
+
+TM --> EM: {\n  success: false,\n  error: "Access denied",\n  accessDenied: true,\n  deniedPath: "node_modules/lib.js"\n}
+deactivate TM
+
+EM -> EM: log error
+EM -> EM: continue with next step
+
+@enduml
+
+@startuml Manager Dependencies
+!theme cerulean-outline
+
+title Manager Dependencies & Initialization Order
+
+package "Initialization Sequence" {
+  component "1. Context Manager" as CTX1 #lightgreen
+  component "2. Ignore Manager" as IM1 #lightgreen
+  component "3. Tool Manager" as TM1 #lightgreen
+  component "4. LLM Manager" as LLM1 #lightgreen
+  component "5. PTK Manager" as PTK1 #lightyellow
+  component "6. Execution Manager" as EM1 #lightyellow
+  component "7. Plan Manager" as PM1 #lightyellow
+  component "8. Complexity Manager" as CM1 #lightyellow
+}
+
+CTX1 -down-> IM1 : ① Initialize first\n(no dependencies)
+IM1 -down-> TM1 : ② Scan project\nGenerate .aiignore
+TM1 -down-> LLM1 : ③ Register tools
+LLM1 -down-> PTK1 : ④ Register provider
+PTK1 -down-> EM1 : ⑤ Ready for execution
+EM1 -down-> PM1 : ⑥ Can execute plans
+PM1 -down-> CM1 : ⑦ Can generate plans
+
+note right of CTX1
+  No dependencies
+  Pure state storage
+end note
+
+note right of IM1
+  Depends on:
+  - File system
+  Provides:
+  - validateAccess()
+end note
+
+note right of TM1
+  Depends on:
+  - IgnoreManager
+  Provides:
+  - execute()
+  - 5 file operations
+end note
+
+note right of LLM1
+  Depends on:
+  - AIStudioBrowser
+  Provides:
+  - call()
+end note
+
+note right of PTK1
+  Depends on:
+  - LLMManager
+  - ToolManager
+  - ContextManager
+end note
+
+note right of EM1
+  Depends on:
+  - All service managers
+end note
+
+@enduml
+
+@startuml Data Flow - Context Passing
+!theme cerulean-outline
+
+title Context Flow Through Execution
+
+object "Initial Context" as ctx1 {
+  userRequest = "Refactor auth"
+  selectedCode = null
+  filePath = null
+  conversationHistory = []
+  completedActions = []
+}
+
+object "After Step 1" as ctx2 {
+  userRequest = "Refactor auth"
+  conversationHistory = [{role: "assistant", ...}]
+  completedActions = ["analyze_current_auth"]
+  **discoveries = ["Found 5 auth files"]**
+}
+
+object "After Step 2" as ctx3 {
+  userRequest = "Refactor auth"
+  conversationHistory = [...]
+  completedActions = [..., "find_auth_files"]
+  discoveries = ["Found 5 auth files"]
+  **filesList = ["auth.ts", "login.ts", ...]**
+}
+
+object "After Step 3" as ctx4 {
+  userRequest = "Refactor auth"
+  conversationHistory = [...]
+  completedActions = [..., "generate_refactored_code"]
+  discoveries = [...]
+  filesList = [...]
+  **refactoredCode = "..."**
+}
+
+object "Final Context" as ctx5 {
+  userRequest = "Refactor auth"
+  conversationHistory = [...]
+  completedActions = [..., "run_tests"]
+  discoveries = [...]
+  filesList = [...]
+  refactoredCode = "..."
+  **testResults = {passed: true}**
+}
+
+ctx1 --> ctx2 : Step 1: Analyze
+ctx2 --> ctx3 : Step 2: Find files
+ctx3 --> ctx4 : Step 3: Generate code
+ctx4 --> ctx5 : Step 4: Run tests
+
+note bottom of ctx5
+  Context accumulates data
+  through execution pipeline
+end note
+
+@enduml
+
+@startuml Phase 1 MVP Architecture
+!theme cerulean-outline
+
+title Phase 1 MVP - Essential Managers Only
+
+package "Phase 1 Implementation" {
+  component "Ignore Manager" as IM {
+    [Auto-scan]
+    [Validate Access]
+    [Generate .aiignore]
+  }
+  
+  component "Tool Manager" as TM {
+    [ReadFileHandler]
+    [WriteFileHandler]
+    [ReplaceInFileHandler]
+    [ListFilesHandler]
+    [SearchFilesHandler]
+  }
+  
+  component "Context Manager" as CTX {
+    [State Storage]
+    [Conversation History]
+  }
+  
+  component "LLM Manager" as LLM {
+    [AIStudioProvider]
+  }
+}
+
+package "Simple Execution (Phase 1)" {
+  component "Simple Orchestrator" as SO {
+    handleUserRequest()
+  }
+}
+
+SO --> LLM : call()
+SO --> TM : execute()
+SO --> CTX : get/set()
+TM --> IM : validateAccess()
+
+note right of SO
+  Phase 1: No complex planning
+  Direct execution only
+  
+  Workflow:
+  1. Get user request
+  2. Call LLM
+  3. Parse response (simple)
+  4. Execute tools if needed
+  5. Return result
+end note
+
+note bottom of IM
+  **Priority 1**
+  3-4 days
+  Auto-detection is key feature
+end note
+
+note bottom of TM
+  **Priority 1**
+  3-4 days
+  Core functionality
+end note
+
+@enduml

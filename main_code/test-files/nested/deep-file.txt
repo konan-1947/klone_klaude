@@ -1,0 +1,3 @@
+Nested file in subfolder
+This file is inside test-files/nested/ directory
+Used to test relative path handling

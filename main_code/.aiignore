@@ -1,0 +1,5 @@
+# Ignore secret files
+test-files/secret.txt
+
+# Ignore all log files
+*.log

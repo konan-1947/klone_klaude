@@ -1,0 +1,54 @@
+@startuml
+!theme cerulean-outline
+
+title Simple Request Flow - Rename Variable
+
+actor User
+participant "VS Code" as VSCode
+participant "Complexity\nManager" as CM
+participant "Execution\nManager" as EM
+participant "LLM\nManager" as LLM
+participant "Tool\nManager" as TM
+participant "Ignore\nManager" as IM
+participant "Context\nManager" as CTX
+participant "AI Studio" as AI
+
+User -> VSCode: "Rename variable x to y"
+activate VSCode
+
+VSCode -> CM: assessComplexity(request)
+activate CM
+CM -> CTX: get(projectInfo)
+CTX --> CM: project context
+CM --> VSCode: complexity = "simple"
+deactivate CM
+
+VSCode -> EM: execute(simple path)
+activate EM
+
+EM -> CTX: set(userRequest, ...)
+EM -> LLM: call(prompt)
+activate LLM
+LLM -> AI: sendPrompt(prompt)
+AI --> LLM: response
+LLM --> EM: refactored code
+deactivate LLM
+
+EM -> TM: execute(write_to_file)
+activate TM
+TM -> IM: validateAccess(filePath)
+activate IM
+IM --> TM: allowed = true
+deactivate IM
+TM -> TM: write file
+TM --> EM: success
+deactivate TM
+
+EM -> CTX: update(completedActions)
+EM --> VSCode: result
+deactivate EM
+
+VSCode --> User: Show inline diff
+deactivate VSCode
+
+@enduml
