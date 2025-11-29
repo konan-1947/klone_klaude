@@ -23,7 +23,7 @@ export interface PTKFactoryOptions {
     workspacePath: string;
     ignoreManager: IgnoreManager;
     llmManager: LLMManager;
-    groqManager?: LLMManager; // Required for optimized mode
+    geminiManager?: LLMManager; // Required for optimized mode
 }
 
 export class PTKManagerFactory {
@@ -33,7 +33,7 @@ export class PTKManagerFactory {
             workspacePath,
             ignoreManager,
             llmManager,
-            groqManager
+            geminiManager
         } = options;
 
         if (mode === PTKMode.STANDARD) {
@@ -51,8 +51,8 @@ export class PTKManagerFactory {
 
         if (mode === PTKMode.OPTIMIZED) {
             // Optimized PTK
-            if (!groqManager) {
-                throw new Error('Groq manager required for optimized mode');
+            if (!geminiManager) {
+                throw new Error('Gemini manager required for optimized mode');
             }
 
             const toolManager = new ToolManager(workspacePath, ignoreManager);
@@ -61,7 +61,7 @@ export class PTKManagerFactory {
 
             return new OptimizedPTKManager(
                 contextBuilder,
-                groqManager,
+                geminiManager,
                 llmManager,
                 batchReader
             );

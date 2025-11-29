@@ -1,5 +1,5 @@
 /**
- * Optimized PTK Manager - Single AI Studio call with Groq preprocessing
+ * Optimized PTK Manager - Single AI Studio call with Gemini preprocessing
  */
 
 import { IPTKManager } from './IPTKManager';
@@ -11,7 +11,7 @@ import { LLMManager } from '../llm/LLMManager';
 export class OptimizedPTKManager implements IPTKManager {
     constructor(
         private contextBuilder: ContextBuilder,
-        private groqManager: LLMManager,      // LLM Manager với Groq provider
+        private geminiManager: LLMManager,      // LLM Manager với Gemini provider
         private aiStudioManager: LLMManager,  // LLM Manager với AI Studio provider
         private batchReader: BatchFileReader
     ) { }
@@ -32,20 +32,20 @@ export class OptimizedPTKManager implements IPTKManager {
 
             const treeView = this.contextBuilder.formatTree(context.tree);
 
-            // Step 2: Groq preprocessing - chọn files cần đọc
-            const groqPrompt = this.buildGroqPrompt(prompt, context.summary, treeView);
-            const groqResponse = await this.groqManager.call(groqPrompt, {
+            // Step 2: Gemini preprocessing - chọn files cần đọc
+            const geminiPrompt = this.buildGeminiPrompt(prompt, context.summary, treeView);
+            const geminiResponse = await this.geminiManager.call(geminiPrompt, {
                 temperature: 0.1
             });
 
-            const filesToRead = this.parseFileList(groqResponse);
+            const filesToRead = this.parseFileList(geminiResponse);
 
             // Record tool calls
             filesToRead.forEach(path => {
                 toolCalls.push({
                     tool: 'read_file',
                     args: { path },
-                    reasoning: 'Selected by Groq preprocessing'
+                    reasoning: 'Selected by Gemini preprocessing'
                 });
             });
 
@@ -102,9 +102,9 @@ export class OptimizedPTKManager implements IPTKManager {
     }
 
     /**
-     * Build prompt for Groq (file selection)
+     * Build prompt for Gemini (file selection)
      */
-    private buildGroqPrompt(userPrompt: string, summary: string, tree: string): string {
+    private buildGeminiPrompt(userPrompt: string, summary: string, tree: string): string {
         return `You are a file selector AI. Analyze the user's question and workspace structure to determine which files need to be read.
 
 Workspace Summary:

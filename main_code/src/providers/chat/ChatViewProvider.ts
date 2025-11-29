@@ -6,7 +6,7 @@ import { checkAuthStatus } from './checkAuthStatus';
 import { initializeBrowserForChat } from './initializeBrowserForChat';
 import { handleLogout } from './handleLogout';
 import { IPTKManager, PTKManagerFactory, PTKMode } from '../../core/ptk';
-import { LLMManager, AIStudioLLMProvider, GroqLLMProvider } from '../../core/llm';
+import { LLMManager, AIStudioLLMProvider, GeminiLLMProvider } from '../../core/llm';
 import { IgnoreManager } from '../../core/ignore/IgnoreManager';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
@@ -111,12 +111,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const aiStudioProvider = new AIStudioLLMProvider(this.aiStudioBrowser);
         aiStudioManager.registerProvider('ai-studio', aiStudioProvider);
 
-        let groqManager: LLMManager | undefined;
-        const groqApiKey = process.env.GROQ_API_KEY;
-        if (groqApiKey) {
-            groqManager = new LLMManager();
-            groqManager.registerProvider('groq', new GroqLLMProvider({ apiKey: groqApiKey }));
-            groqManager.setProvider('groq'); // ✅ Set active provider
+        let geminiManager: LLMManager | undefined;
+        const geminiApiKey = process.env.GEMINI_API_KEY;
+        if (geminiApiKey) {
+            geminiManager = new LLMManager();
+            geminiManager.registerProvider('gemini', new GeminiLLMProvider({ apiKey: geminiApiKey }));
+            geminiManager.setProvider('gemini'); // ✅ Set active provider
         }
 
         const mode = (process.env.PTK_MODE || 'optimized') === 'standard' ? PTKMode.STANDARD : PTKMode.OPTIMIZED;
@@ -126,7 +126,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             workspacePath,
             ignoreManager,
             llmManager: aiStudioManager,
-            groqManager
+            geminiManager
         });
     }
 

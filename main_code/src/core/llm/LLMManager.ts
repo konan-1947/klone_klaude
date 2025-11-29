@@ -5,7 +5,7 @@
 import { ILLMManager } from './ILLMManager';
 import { LLMOptions } from '../ptk/types';
 
-export type LLMProvider = 'ai-studio' | 'groq' | 'openai';
+export type LLMProvider = 'ai-studio' | 'groq' | 'gemini' | 'openai';
 
 export class LLMManager implements ILLMManager {
     private providers: Map<LLMProvider, ILLMManager>;

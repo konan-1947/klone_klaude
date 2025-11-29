@@ -13,10 +13,6 @@ import { findInputElement } from './findInputElement';
 import { clickSendButton } from './clickSendButton';
 import { waitForResponse } from './waitForResponse';
 
-/**
- * Send prompt with file upload instead of typing
- * Much faster than page.type() for large content
- */
 export const sendPromptWithFile = async (
     page: Page,
     prompt: string,
@@ -29,17 +25,14 @@ export const sendPromptWithFile = async (
     try {
         logger.info('Starting sendPromptWithFile...');
 
-        // Step 1: Build context file content
         const contextContent = buildContextFile(fileContents, workspaceSummary);
         logger.info(`Context file size: ${contextContent.length} bytes`);
 
-        // Step 2: Save to temp file
         const tempDir = os.tmpdir();
         tempFilePath = path.join(tempDir, `ai-context-${Date.now()}.txt`);
         await fs.promises.writeFile(tempFilePath, contextContent, 'utf-8');
         logger.info(`Temp file created: ${tempFilePath}`);
 
-        // Step 3: Navigate to AI Studio
         logger.info('Navigating to AI Studio new chat...');
         await page.goto(URLS.AI_STUDIO_NEW_CHAT, {
             waitUntil: 'networkidle2',
@@ -48,28 +41,36 @@ export const sendPromptWithFile = async (
 
         await delay(TIMEOUTS.ANGULAR_RENDER_DELAY);
 
-        // Step 4: Upload file (drag & drop)
+        // Bring browser to front - CRITICAL for drop events
+        await page.bringToFront();
+        logger.info('Browser brought to front');
+        await delay(500);
+
+        // Clear input
+        const clearSel = await findInputElement(page);
+        await page.evaluate((sel) => {
+            const el = document.querySelector(sel) as any;
+            if (el) {
+                el.value = '';
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }, clearSel);
+
+        logger.info('Input cleared');
+
+        // Upload file
         await uploadFile(page, tempFilePath);
-
-        // Wait for file to be attached
         await delay(2000);
+        logger.info('File attached');
 
-        // DEBUG: Screenshot sau khi upload
-        await page.screenshot({
-            path: 'd:/desktop_data/Code_Dao/convert_ide_to_chatbot/main_code/test_img_screenshot/after-upload.png'
-        });
-        logger.info('File attached, screenshot saved');
-
-        // Step 5: Type short prompt
+        // Type prompt
         logger.info('Typing prompt...');
         const inputSelector = await findInputElement(page);
         await page.click(inputSelector);
         await delay(TIMEOUTS.INPUT_FOCUS_DELAY);
 
-        // Build final prompt
         const finalPrompt = `${prompt}\n\nRefer to the uploaded context file for codebase details.`;
 
-        // Use fast input method (page.evaluate instead of page.type)
         await page.evaluate((selector, text) => {
             const element = document.querySelector(selector) as any;
             if (element) {
@@ -81,10 +82,10 @@ export const sendPromptWithFile = async (
 
         await delay(TIMEOUTS.AFTER_TYPE_DELAY);
 
-        // Step 6: Click send
+        // Send
         await clickSendButton(page);
 
-        // Step 7: Wait for response
+        // Wait response
         const response = await waitForResponse(page, context);
 
         logger.info('Response received successfully');
@@ -94,7 +95,6 @@ export const sendPromptWithFile = async (
         logger.error('sendPromptWithFile failed:', error);
         throw new Error(`Send prompt with file failed: ${error.message}`);
     } finally {
-        // Step 8: Cleanup temp file
         if (tempFilePath) {
             try {
                 await fs.promises.unlink(tempFilePath);
