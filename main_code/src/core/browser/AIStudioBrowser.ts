@@ -8,6 +8,7 @@ import { sendPrompt as sendPromptFunc } from './sendPrompt';
 import { sendPromptWithFile as sendPromptWithFileFunc } from './sendPromptWithFile';
 import { closeBrowser } from './closeBrowser';
 import { FileContent } from '../tools/BatchFileReader';
+import { waitForModelThoughts } from './waitForModelThoughts';
 
 export class AIStudioBrowser {
     private browser: Browser | null = null;
@@ -148,6 +149,22 @@ export class AIStudioBrowser {
             logger.info('Browser window minimized');
         } catch (err) {
             logger.debug('Could not minimize window:', err);
+        }
+    }
+
+    async waitForModelThoughtsAndMinimize(): Promise<void> {
+        if (!this.page) {
+            throw new Error('Browser not initialized');
+        }
+
+        try {
+            // Đợi text "Expand to view model thoughts" xuất hiện
+            await waitForModelThoughts(this.page);
+
+            // Sau đó minimize browser
+            await this.minimizeWindow();
+        } catch (err) {
+            logger.debug('Could not wait for model thoughts or minimize:', err);
         }
     }
 
