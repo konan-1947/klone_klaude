@@ -48,10 +48,20 @@ export const sendPromptWithFile = async (
 
         await delay(TIMEOUTS.ANGULAR_RENDER_DELAY);
 
-        // Step 4: Upload file
+        // Step 4: Upload file (drag & drop)
         await uploadFile(page, tempFilePath);
 
+        // Wait for file to be attached
+        await delay(2000);
+
+        // DEBUG: Screenshot sau khi upload
+        await page.screenshot({
+            path: 'd:/desktop_data/Code_Dao/convert_ide_to_chatbot/main_code/test_img_screenshot/after-upload.png'
+        });
+        logger.info('File attached, screenshot saved');
+
         // Step 5: Type short prompt
+        logger.info('Typing prompt...');
         const inputSelector = await findInputElement(page);
         await page.click(inputSelector);
         await delay(TIMEOUTS.INPUT_FOCUS_DELAY);
