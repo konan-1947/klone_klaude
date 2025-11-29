@@ -41,20 +41,26 @@ export const sendPromptWithFile = async (
 
         await delay(TIMEOUTS.ANGULAR_RENDER_DELAY);
 
-        // Bring browser to front - CRITICAL for drop events
-        await page.bringToFront();
-        logger.info('Browser brought to front');
+        // Try to activate window by clicking input multiple times
+        const activateInput = await findInputElement(page);
+        logger.info('Attempting to activate window with clicks...');
+
+        for (let i = 0; i < 3; i++) {
+            await page.click(activateInput);
+            await delay(200);
+        }
+
+        logger.info('Window activation attempted');
         await delay(500);
 
         // Clear input
-        const clearSel = await findInputElement(page);
         await page.evaluate((sel) => {
             const el = document.querySelector(sel) as any;
             if (el) {
                 el.value = '';
                 el.dispatchEvent(new Event('input', { bubbles: true }));
             }
-        }, clearSel);
+        }, activateInput);
 
         logger.info('Input cleared');
 
