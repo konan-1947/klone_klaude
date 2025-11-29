@@ -12,8 +12,18 @@ export class AIStudioLLMProvider implements ILLMManager {
 
     async call(prompt: string, options?: LLMOptions): Promise<string> {
         try {
-            // AI Studio Browser doesn't support options yet
-            // Options will be used in future for model selection, temperature, etc.
+            // Check if upload mode is requested and has file contents
+            if (options?.mode === 'upload' && options.fileContents && options.fileContents.length > 0) {
+                // Use upload mode
+                const response = await this.aiStudioBrowser.sendPromptWithFile(
+                    prompt,
+                    options.fileContents,
+                    options.workspaceSummary || ''
+                );
+                return response;
+            }
+
+            // Otherwise use inline mode (default)
             const response = await this.aiStudioBrowser.sendPrompt(prompt);
             return response;
         } catch (error: any) {

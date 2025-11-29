@@ -67,16 +67,13 @@ export class OptimizedPTKManager implements IPTKManager {
                 };
             }
 
-            // Step 4: Single AI Studio call với full context
-            const aiStudioPrompt = this.buildAIStudioPrompt(
-                prompt,
-                context.summary,
-                this.batchReader.formatForPrompt(fileContents)
-            );
-
-            const answer = await this.aiStudioManager.call(aiStudioPrompt, {
+            // Step 4: Single AI Studio call với upload mode
+            const answer = await this.aiStudioManager.call(prompt, {
                 model: options.model,
-                temperature: options.temperature || 0.7
+                temperature: options.temperature || 0.7,
+                mode: 'upload',
+                fileContents: fileContents,
+                workspaceSummary: context.summary
             });
 
             // Success!

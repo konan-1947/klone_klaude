@@ -5,7 +5,9 @@ import { logger } from '../../utils/logger';
 import { initializeBrowser } from './initializeBrowser';
 import { ensureAuthenticated } from './ensureAuthenticated';
 import { sendPrompt as sendPromptFunc } from './sendPrompt';
+import { sendPromptWithFile as sendPromptWithFileFunc } from './sendPromptWithFile';
 import { closeBrowser } from './closeBrowser';
+import { FileContent } from '../tools/BatchFileReader';
 
 export class AIStudioBrowser {
     private browser: Browser | null = null;
@@ -60,6 +62,37 @@ export class AIStudioBrowser {
 
         try {
             return await sendPromptFunc(this.page, prompt, this.context);
+        } catch (error: any) {
+            // Kiểm tra nếu là lỗi do browser bị đóng
+            if (error.message.includes('Target closed') ||
+                error.message.includes('Session closed') ||
+                error.message.includes('Requesting main frame too early')) {
+                this.browser = null;
+                this.page = null;
+                this.isAuthenticated = false;
+                throw new Error('Browser đã bị đóng. Vui lòng khởi tạo lại.');
+            }
+            throw error;
+        }
+    }
+
+    async sendPromptWithFile(
+        prompt: string,
+        fileContents: FileContent[],
+        workspaceSummary: string
+    ): Promise<string> {
+        if (!this.page || !this.isAuthenticated) {
+            throw new Error('Not authenticated');
+        }
+
+        try {
+            return await sendPromptWithFileFunc(
+                this.page,
+                prompt,
+                fileContents,
+                workspaceSummary,
+                this.context
+            );
         } catch (error: any) {
             // Kiểm tra nếu là lỗi do browser bị đóng
             if (error.message.includes('Target closed') ||

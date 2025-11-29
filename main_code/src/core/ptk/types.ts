@@ -139,4 +139,9 @@ export interface LLMOptions {
     model?: string;
     temperature?: number;
     maxTokens?: number;
+
+    // Upload mode options
+    mode?: 'inline' | 'upload';
+    fileContents?: import('../tools/BatchFileReader').FileContent[];
+    workspaceSummary?: string;
 }

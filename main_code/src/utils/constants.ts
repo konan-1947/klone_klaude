@@ -8,6 +8,7 @@ export const TIMEOUTS = {
     AFTER_TYPE_DELAY: 1000,
     MAX_LOGIN_WAIT: 5 * 60 * 1000,
     LOGIN_CHECK_INTERVAL: 2000,
+    FILE_UPLOAD_DELAY: 3000,  // Wait for file upload to complete
 } as const;
 
 export const RETRY_COUNTS = {
@@ -50,6 +51,19 @@ export const SELECTORS = {
         '[data-prompt-input]',
         '.prompt-editor',
         'textarea[placeholder*="prompt"]',
+    ],
+    FILE_UPLOAD: [
+        // Primary selector - Found in AI Studio UI
+        'button[aria-label="Upload File"] input[type="file"]',
+
+        // Fallback selectors
+        'input[type="file"]',
+        '[data-test-upload-file-input]',
+        'button[aria-label*="Upload"] input[type="file"]',
+        '[aria-label*="attach"] input[type="file"]',
+
+        // Generic fallback
+        'input[type="file"][style*="display: none"]',
     ],
     CHAT_CONTAINER: '.chat-turn-container',
     TURN_CONTENT: '.turn-content',
