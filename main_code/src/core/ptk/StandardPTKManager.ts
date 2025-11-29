@@ -8,6 +8,7 @@ import { PTKParser } from './PTKParser';
 import { LLMManager } from '../llm/LLMManager';
 import { ToolRegistry } from '../tools/ToolRegistry';
 import { ContextManager } from '../context/ContextManager';
+import { LogEmitter } from '../logging';
 import {
     PTKTool,
     PTKMessage,
@@ -20,14 +21,17 @@ import { PTKExecutionError, PTKErrorCode } from './errors';
 export class StandardPTKManager implements IPTKManager {
     private formatter: PTKFormatter;
     private parser: PTKParser;
+    private logEmitter?: LogEmitter;
 
     constructor(
         private llmManager: LLMManager,
         private toolRegistry: ToolRegistry,
-        private contextManager: ContextManager
+        private contextManager: ContextManager,
+        logEmitter?: LogEmitter
     ) {
         this.formatter = new PTKFormatter();
         this.parser = new PTKParser();
+        this.logEmitter = logEmitter;
     }
 
     /**
@@ -80,20 +84,25 @@ export class StandardPTKManager implements IPTKManager {
         let toolCallCount = 0;
         const startTime = Date.now();
 
+        this.logEmitter?.emit('info', 'ptk', `Bắt đầu orchestration (max ${maxIterations} iterations, ${availableTools.length} tools)`);
+
         while (iteration < maxIterations) {
             iteration++;
+            this.logEmitter?.emit('info', 'ptk', `Iteration ${iteration}/${maxIterations}`);
 
             try {
                 // Format conversation for LLM
                 const fullPrompt = this.formatter.formatConversation(messages);
 
                 // Call LLM (delegate to LLMManager)
+                this.logEmitter?.emit('info', 'ptk', 'Gửi prompt tới LLM...');
                 const llmResponse = await this.llmManager.call(fullPrompt, {
                     model: options.model,
                     temperature: options.temperature
                 });
 
                 // Parse response
+                this.logEmitter?.emit('info', 'ptk', 'Parsing response từ LLM...');
                 const parsed = this.parser.parse(llmResponse);
 
                 onIteration?.({
@@ -105,6 +114,7 @@ export class StandardPTKManager implements IPTKManager {
 
                 if (parsed.type === 'text') {
                     // Done - final answer from LLM
+                    this.logEmitter?.emit('info', 'ptk', `Nhận final answer từ LLM (${iteration} iterations, ${toolCallCount} tool calls)`);
                     return {
                         success: true,
                         content: parsed.content!,
@@ -117,8 +127,11 @@ export class StandardPTKManager implements IPTKManager {
                 }
 
                 if (parsed.type === 'tool_call') {
+                    this.logEmitter?.emit('info', 'ptk', `Phát hiện tool call: ${parsed.toolCall?.tool}`);
+
                     // Check tool call limit
                     if (toolCallCount >= maxToolCalls) {
+                        this.logEmitter?.emit('error', 'ptk', `Đạt giới hạn tool calls (${maxToolCalls})`);
                         return {
                             success: false,
                             content: '',
@@ -185,14 +198,18 @@ export class StandardPTKManager implements IPTKManager {
                     onToolCall?.(parsed.toolCall!);
 
                     // Execute tool (delegate to ToolManager via handler)
+                    const argsStr = JSON.stringify(parsed.toolCall!.args).substring(0, 100);
+                    this.logEmitter?.emit('info', 'tool', `Executing ${parsed.toolCall!.tool}(${argsStr}...)`);
                     const toolResult = await tool.handler(parsed.toolCall!.args);
 
                     toolCalls.push(parsed.toolCall!);
                     toolCallCount++;
+                    this.logEmitter?.emit('info', 'tool', `Tool ${parsed.toolCall!.tool} completed`);
 
                     // FALLBACK: If tool execution failed, return error immediately
                     // Don't send back to LLM as it may cause infinite loop
                     if (toolResult.success === false || toolResult.error) {
+                        this.logEmitter?.emit('error', 'tool', `Tool ${parsed.toolCall!.tool} failed: ${toolResult.error}`);
                         return {
                             success: false,
                             content: '',
@@ -225,6 +242,7 @@ export class StandardPTKManager implements IPTKManager {
 
             } catch (error: any) {
                 onError?.(error);
+                this.logEmitter?.emit('error', 'ptk', `Error: ${error.message}`);
 
                 return {
                     success: false,

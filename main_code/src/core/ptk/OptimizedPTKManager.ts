@@ -7,14 +7,20 @@ import { PTKExecuteOptions, PTKExecuteResult, PTKToolCall } from './types';
 import { ContextBuilder } from '../context/ContextBuilder';
 import { BatchFileReader } from '../tools/BatchFileReader';
 import { LLMManager } from '../llm/LLMManager';
+import { LogEmitter } from '../logging';
 
 export class OptimizedPTKManager implements IPTKManager {
+    private logEmitter?: LogEmitter;
+
     constructor(
         private contextBuilder: ContextBuilder,
         private geminiManager: LLMManager,      // LLM Manager với Gemini provider
         private aiStudioManager: LLMManager,  // LLM Manager với AI Studio provider
-        private batchReader: BatchFileReader
-    ) { }
+        private batchReader: BatchFileReader,
+        logEmitter?: LogEmitter
+    ) {
+        this.logEmitter = logEmitter;
+    }
 
     async orchestrateToolCalling(
         prompt: string,
@@ -23,22 +29,28 @@ export class OptimizedPTKManager implements IPTKManager {
         const startTime = Date.now();
         const toolCalls: PTKToolCall[] = [];
 
+        this.logEmitter?.emit('info', 'ptk', 'Optimized PTK: Bắt đầu orchestration');
+
         try {
             // Step 1: Build workspace context
+            this.logEmitter?.emit('info', 'file', 'Đang build workspace context...');
             const context = await this.contextBuilder.buildContext({
                 maxDepth: 3,
                 includeIgnored: false
             });
+            this.logEmitter?.emit('info', 'file', `Context built: ${context.summary.split('\n')[0]}`);
 
             const treeView = this.contextBuilder.formatTree(context.tree);
 
             // Step 2: Gemini preprocessing - chọn files cần đọc
+            this.logEmitter?.emit('info', 'llm', 'Gửi prompt tới Gemini để chọn files...');
             const geminiPrompt = this.buildGeminiPrompt(prompt, context.summary, treeView);
             const geminiResponse = await this.geminiManager.call(geminiPrompt, {
                 temperature: 0.1
             });
 
             const filesToRead = this.parseFileList(geminiResponse);
+            this.logEmitter?.emit('info', 'llm', `Gemini chọn ${filesToRead.length} files: ${filesToRead.join(', ')}`);
 
             // Record tool calls
             filesToRead.forEach(path => {
@@ -50,7 +62,9 @@ export class OptimizedPTKManager implements IPTKManager {
             });
 
             // Step 3: Read files locally (batch)
+            this.logEmitter?.emit('info', 'file', `Đọc ${filesToRead.length} files...`);
             const fileContents = await this.batchReader.readFiles(filesToRead);
+            this.logEmitter?.emit('info', 'file', `Đã đọc ${fileContents.filter(f => f.success).length}/${filesToRead.length} files thành công`);
 
             // Check if any file failed
             const failedFiles = fileContents.filter(f => !f.success);
@@ -68,6 +82,7 @@ export class OptimizedPTKManager implements IPTKManager {
             }
 
             // Step 4: Single AI Studio call với upload mode
+            this.logEmitter?.emit('info', 'llm', 'Gửi prompt tới AI Studio (upload mode)...');
             const answer = await this.aiStudioManager.call(prompt, {
                 model: options.model,
                 temperature: options.temperature || 0.7,
@@ -75,8 +90,10 @@ export class OptimizedPTKManager implements IPTKManager {
                 fileContents: fileContents,
                 workspaceSummary: context.summary
             });
+            this.logEmitter?.emit('info', 'llm', 'Nhận response từ AI Studio');
 
             // Success!
+            this.logEmitter?.emit('info', 'ptk', `Optimized PTK hoàn thành (${filesToRead.length} files read, 1 AI Studio call)`);
             return {
                 success: true,
                 content: answer,
@@ -88,6 +105,7 @@ export class OptimizedPTKManager implements IPTKManager {
             };
 
         } catch (error: any) {
+            this.logEmitter?.emit('error', 'ptk', `Optimized PTK error: ${error.message}`);
             return {
                 success: false,
                 content: '',

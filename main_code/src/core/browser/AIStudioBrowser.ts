@@ -107,6 +107,50 @@ export class AIStudioBrowser {
         }
     }
 
+    async showWindow(): Promise<void> {
+        if (!this.page) {
+            throw new Error('Browser not initialized');
+        }
+
+        try {
+            const target = this.page.target();
+            const session = await target.createCDPSession();
+            const { windowId } = await session.send('Browser.getWindowForTarget');
+            await session.send('Browser.setWindowBounds', {
+                windowId,
+                bounds: {
+                    windowState: 'normal'
+                }
+            });
+            await session.detach();
+            logger.info('Browser window shown');
+        } catch (err) {
+            logger.debug('Could not show window:', err);
+        }
+    }
+
+    async minimizeWindow(): Promise<void> {
+        if (!this.page) {
+            throw new Error('Browser not initialized');
+        }
+
+        try {
+            const target = this.page.target();
+            const session = await target.createCDPSession();
+            const { windowId } = await session.send('Browser.getWindowForTarget');
+            await session.send('Browser.setWindowBounds', {
+                windowId,
+                bounds: {
+                    windowState: 'minimized'
+                }
+            });
+            await session.detach();
+            logger.info('Browser window minimized');
+        } catch (err) {
+            logger.debug('Could not minimize window:', err);
+        }
+    }
+
     async close(): Promise<void> {
         await closeBrowser({
             browser: this.browser,

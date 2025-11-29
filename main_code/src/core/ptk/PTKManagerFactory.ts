@@ -24,6 +24,7 @@ export interface PTKFactoryOptions {
     ignoreManager: IgnoreManager;
     llmManager: LLMManager;
     geminiManager?: LLMManager; // Required for optimized mode
+    logEmitter?: any; // LogEmitter instance for logging
 }
 
 export class PTKManagerFactory {
@@ -33,7 +34,8 @@ export class PTKManagerFactory {
             workspacePath,
             ignoreManager,
             llmManager,
-            geminiManager
+            geminiManager,
+            logEmitter
         } = options;
 
         if (mode === PTKMode.STANDARD) {
@@ -45,7 +47,8 @@ export class PTKManagerFactory {
             return new StandardPTKManager(
                 llmManager,
                 toolRegistry,
-                contextManager
+                contextManager,
+                logEmitter
             );
         }
 
@@ -63,7 +66,8 @@ export class PTKManagerFactory {
                 contextBuilder,
                 geminiManager,
                 llmManager,
-                batchReader
+                batchReader,
+                logEmitter
             );
         }
 

@@ -8,6 +8,7 @@ import { handleLogout } from './handleLogout';
 import { IPTKManager, PTKManagerFactory, PTKMode } from '../../core/ptk';
 import { LLMManager, AIStudioLLMProvider, GeminiLLMProvider } from '../../core/llm';
 import { IgnoreManager } from '../../core/ignore/IgnoreManager';
+import { LogEmitter, LogEntry } from '../../core/logging';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'ai-agent-chat';
@@ -16,12 +17,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private cookieManager: CookieManager;
     private isInitialized: boolean = false;
     private ptkManager?: IPTKManager;
+    private logEmitter: LogEmitter;
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
         private context: vscode.ExtensionContext
     ) {
         this.cookieManager = new CookieManager(context);
+        this.logEmitter = new LogEmitter();
+
+        // Subscribe to logs and forward to webview
+        this.logEmitter.on((log: LogEntry) => {
+            this._view?.webview.postMessage({
+                type: 'log',
+                timestamp: log.timestamp,
+                level: log.level,
+                category: log.category,
+                message: log.message
+            });
+        });
     }
 
     public resolveWebviewView(
@@ -58,6 +72,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'logout':
                     await this.logout();
+                    break;
+                case 'clearLogs':
+                    // Frontend cleared logs, no action needed on backend
                     break;
             }
         });
@@ -108,14 +125,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         await ignoreManager.initialize();
 
         const aiStudioManager = new LLMManager();
-        const aiStudioProvider = new AIStudioLLMProvider(this.aiStudioBrowser);
+        const aiStudioProvider = new AIStudioLLMProvider(this.aiStudioBrowser, this.logEmitter);
         aiStudioManager.registerProvider('ai-studio', aiStudioProvider);
 
         let geminiManager: LLMManager | undefined;
         const geminiApiKey = process.env.GEMINI_API_KEY;
         if (geminiApiKey) {
             geminiManager = new LLMManager();
-            geminiManager.registerProvider('gemini', new GeminiLLMProvider({ apiKey: geminiApiKey }));
+            geminiManager.registerProvider('gemini', new GeminiLLMProvider({
+                apiKey: geminiApiKey,
+                logEmitter: this.logEmitter
+            }));
             geminiManager.setProvider('gemini'); // ✅ Set active provider
         }
 
@@ -126,7 +146,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             workspacePath,
             ignoreManager,
             llmManager: aiStudioManager,
-            geminiManager
+            geminiManager,
+            logEmitter: this.logEmitter
         });
     }
 
