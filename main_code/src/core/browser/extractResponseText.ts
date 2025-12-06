@@ -14,7 +14,7 @@ export const extractResponseText = async (page: Page): Promise<string> => {
                 thinkingSections.forEach(el => el.remove());
                 const buttons = clone.querySelectorAll('button');
                 buttons.forEach(el => el.remove());
-                return clone.textContent?.trim() || '';
+                return clone.innerHTML?.trim() || '';
             }
         }
         return '';

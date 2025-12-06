@@ -10,7 +10,15 @@ let loadingElement = null;
 function addMessage(text, type) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}-message`;
-    messageDiv.textContent = text;
+
+    if (type === 'bot') {
+        // Render markdown cho bot response
+        messageDiv.innerHTML = marked.parse(text);
+    } else {
+        // User message giữ nguyên textContent
+        messageDiv.textContent = text;
+    }
+
     chatContainer.appendChild(messageDiv);
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }

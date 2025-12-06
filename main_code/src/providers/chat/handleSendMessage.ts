@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { AIStudioBrowser } from '../../core/browser/AIStudioBrowser';
+import { convertHtmlToMarkdown } from '../../utils/htmlToMarkdown';
 
 export const handleSendMessage = async (
     view: vscode.WebviewView | undefined,
@@ -16,11 +17,12 @@ export const handleSendMessage = async (
     }
 
     try {
-        const response = await aiStudioBrowser.sendPrompt(message);
+        const htmlResponse = await aiStudioBrowser.sendPrompt(message);
+        const markdownResponse = convertHtmlToMarkdown(htmlResponse);
 
         view?.webview.postMessage({
             type: 'receiveMessage',
-            message: response
+            message: markdownResponse
         });
     } catch (error: any) {
         view?.webview.postMessage({

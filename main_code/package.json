@@ -73,10 +73,12 @@
         "watch": "tsc -watch -p ./"
     },
     "dependencies": {
+        "@types/turndown": "^5.0.6",
         "chokidar": "^5.0.0",
         "dotenv": "^17.2.3",
         "ignore": "^7.0.5",
         "puppeteer": "^21.0.0",
+        "turndown": "^7.2.2",
         "ws": "^8.14.0"
     },
     "devDependencies": {

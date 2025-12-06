@@ -87,6 +87,108 @@ body {
     margin-right: auto;
 }
 
+/* Markdown styles in bot messages */
+.bot-message p {
+    margin: 0 0 8px 0;
+}
+
+.bot-message p:last-child {
+    margin-bottom: 0;
+}
+
+.bot-message code {
+    background-color: var(--vscode-textCodeBlock-background);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: var(--vscode-editor-font-family);
+    font-size: 12px;
+}
+
+.bot-message pre {
+    background-color: var(--vscode-textCodeBlock-background);
+    padding: 12px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+.bot-message pre code {
+    background: none;
+    padding: 0;
+}
+
+.bot-message h1,
+.bot-message h2,
+.bot-message h3,
+.bot-message h4,
+.bot-message h5,
+.bot-message h6 {
+    margin: 12px 0 8px 0;
+    font-weight: 600;
+}
+
+.bot-message h1 {
+    font-size: 1.5em;
+}
+
+.bot-message h2 {
+    font-size: 1.3em;
+}
+
+.bot-message h3 {
+    font-size: 1.1em;
+}
+
+.bot-message ul,
+.bot-message ol {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+.bot-message li {
+    margin: 4px 0;
+}
+
+.bot-message a {
+    color: var(--vscode-textLink-foreground);
+    text-decoration: none;
+}
+
+.bot-message a:hover {
+    text-decoration: underline;
+}
+
+.bot-message blockquote {
+    border-left: 3px solid var(--vscode-panel-border);
+    padding-left: 12px;
+    margin: 8px 0;
+    color: var(--vscode-descriptionForeground);
+}
+
+.bot-message table {
+    border-collapse: collapse;
+    margin: 8px 0;
+    width: 100%;
+}
+
+.bot-message th,
+.bot-message td {
+    border: 1px solid var(--vscode-panel-border);
+    padding: 6px 12px;
+    text-align: left;
+}
+
+.bot-message th {
+    background-color: var(--vscode-textCodeBlock-background);
+    font-weight: 600;
+}
+
+.bot-message hr {
+    border: none;
+    border-top: 1px solid var(--vscode-panel-border);
+    margin: 12px 0;
+}
+
 /* Log message styles */
 .log-message {
     font-size: 11px;
