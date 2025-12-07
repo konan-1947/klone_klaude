@@ -24,11 +24,6 @@ export class AIStudioLLMProvider implements ILLMManager {
                 // Use upload mode
                 this.logEmitter?.emit('info', 'llm', `AI Studio: Sending prompt with ${options.fileContents.length} files (upload mode)`);
 
-                // Bắt đầu đợi "Expand to view model thoughts" để minimize (không chờ kết quả)
-                this.aiStudioBrowser.waitForModelThoughtsAndMinimize().catch(err => {
-                    this.logEmitter?.emit('warning', 'llm', `Failed to auto-minimize: ${err.message}`);
-                });
-
                 const response = await this.aiStudioBrowser.sendPromptWithFile(
                     prompt,
                     options.fileContents,
@@ -36,19 +31,24 @@ export class AIStudioLLMProvider implements ILLMManager {
                 );
                 this.logEmitter?.emit('info', 'llm', `AI Studio: Received response (${response.length} chars)`);
 
+                // Thu nhỏ browser sau khi đã nhận hết kết quả
+                this.aiStudioBrowser.minimizeWindow().catch(err => {
+                    this.logEmitter?.emit('warning', 'llm', `Failed to minimize: ${err.message}`);
+                });
+
                 return response;
             }
 
             // Otherwise use inline mode (default)
             this.logEmitter?.emit('info', 'llm', `AI Studio: Sending prompt (inline mode, ${prompt.length} chars)`);
 
-            // Bắt đầu đợi "Expand to view model thoughts" để minimize (không chờ kết quả)
-            this.aiStudioBrowser.waitForModelThoughtsAndMinimize().catch(err => {
-                this.logEmitter?.emit('warning', 'llm', `Failed to auto-minimize: ${err.message}`);
-            });
-
             const response = await this.aiStudioBrowser.sendPrompt(prompt);
             this.logEmitter?.emit('info', 'llm', `AI Studio: Received response (${response.length} chars)`);
+
+            // Thu nhỏ browser sau khi đã nhận hết kết quả
+            this.aiStudioBrowser.minimizeWindow().catch(err => {
+                this.logEmitter?.emit('warning', 'llm', `Failed to minimize: ${err.message}`);
+            });
 
             return response;
         } catch (error: any) {
